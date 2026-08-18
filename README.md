@@ -10,11 +10,14 @@ externa: um arquivo, funciona offline, inclusive com duplo clique.
 
 ## Os três entregáveis
 
-| Entregável | Onde está |
-|---|---|
-| **1 — Diagrama de Casos de Uso** | Aba *Casos de uso* em `index.html` · [`docs/01-diagrama-casos-de-uso.md`](docs/01-diagrama-casos-de-uso.md) · figura isolada em [`docs/diagrama-casos-de-uso.svg`](docs/diagrama-casos-de-uso.svg) |
-| **2 — Especificação textual** | Aba *Especificações* em `index.html` · [`docs/02-especificacao-casos-de-uso.md`](docs/02-especificacao-casos-de-uso.md) |
-| **3 — Protótipo funcional** | Aba *Mapa* em `index.html` |
+| Entregável | Documento para entregar | Fontes |
+|---|---|---|
+| **1 — Diagrama de Casos de Uso** | [`docs/entregavel-1-diagrama.pdf`](docs/entregavel-1-diagrama.pdf) · 5 páginas, A4 | [`docs/01-diagrama-casos-de-uso.md`](docs/01-diagrama-casos-de-uso.md) · figura isolada em [`docs/diagrama-casos-de-uso.svg`](docs/diagrama-casos-de-uso.svg) |
+| **2 — Especificação textual** | [`docs/entregavel-2-especificacao.pdf`](docs/entregavel-2-especificacao.pdf) · 12 páginas, A4 | [`docs/02-especificacao-casos-de-uso.md`](docs/02-especificacao-casos-de-uso.md) |
+| **3 — Protótipo funcional** | [`index.html`](index.html) — abra no navegador | — |
+
+Os entregáveis 1 e 2 são documentos separados, em PDF. O protótipo é só o mapa:
+a documentação não fica embutida na aplicação.
 
 O diagrama tem 5 atores e 16 casos de uso, com 7 relações `include`, 5 `extend`,
 generalização de atores (Familiar do Paciente e Médico → Usuário do Sistema) e
@@ -89,12 +92,27 @@ porque toda a lógica já opera sobre `{lat, lon}`.
 
 ```
 webgis-saude-bh/
-├── index.html                          protótipo + diagrama + especificações
+├── index.html                            protótipo WebGIS (entregável 3)
 ├── README.md
 └── docs/
-    ├── 01-diagrama-casos-de-uso.md     entregável 1 (com fontes PlantUML e Mermaid)
-    ├── 02-especificacao-casos-de-uso.md entregável 2 (16 tabelas)
-    └── diagrama-casos-de-uso.svg       figura isolada, para colar no relatório
+    ├── entregavel-1-diagrama.pdf         ENTREGÁVEL 1 — documento final
+    ├── entregavel-2-especificacao.pdf    ENTREGÁVEL 2 — documento final
+    ├── 01-diagrama-casos-de-uso.md       fonte do entregável 1 (PlantUML e Mermaid)
+    ├── 02-especificacao-casos-de-uso.md  fonte do entregável 2 (16 tabelas)
+    ├── diagrama-casos-de-uso.svg         figura isolada, para colar no relatório
+    └── print/                            HTML de onde os PDFs são impressos
+```
+
+### Regerar os PDFs
+
+Os PDFs saem do HTML em `docs/print/` via Chrome headless. O layout de impressão
+está no próprio arquivo: A4 retrato para o texto e uma folha em paisagem dedicada
+ao diagrama, para o UML sair legível.
+
+```bash
+chrome --headless=new --no-pdf-header-footer \
+  --print-to-pdf=docs/entregavel-1-diagrama.pdf \
+  docs/print/entregavel-1-diagrama.html
 ```
 
 ---

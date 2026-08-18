@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Entregavel 2 - Especificacao textual dos casos de uso</title>
+<style>
+/* ==========================================================================
+   GeoSaúde BH — Sistema de design
+   Direção: instrumento cartográfico. Folha de planta + console clínico.
+   Semiologia: cada categoria tem UMA cor, repetida em marcador, legenda,
+   chip de lista e anel de busca. Nada de cor decorativa.
+   ========================================================================== */
+
+:root{
+  /* --- superfícies --- */
+  --paper:        #eaeeee;
+  --chrome:       #ffffff;
+  --chrome-2:     #f4f7f7;
+  --chrome-3:     #e9eeef;
+  --rule:         #d3dee1;
+  --rule-soft:    #e3ebec;
+
+  /* --- tinta --- */
+  --ink:          #0d1b24;
+  --ink-2:        #4d6773;
+  --ink-3:        #7d949e;
+
+  /* --- sinal (semiologia) --- */
+  --sig-hospital: #c2263f;
+  --sig-farmacia: #0b8a5f;
+  --sig-lab:      #5844c6;
+  --sig-ubs:      #b5701a;
+  --accent:       #06707c;
+  --accent-soft:  #d3ecee;
+
+  /* --- mapa --- */
+  --map-bg:       #e6ebe7;
+  --map-block:    #f2f5f1;
+  --map-minor:    #ffffff;
+  --map-minor-c:  #dae1da;
+  --map-major:    #ffffff;
+  --map-major-c:  #c3ccc2;
+  --map-park:     #cbdec4;
+  --map-park-l:   #4c7042;
+  --map-bairro:   #0d1b24;
+  --map-label:    #55666b;
+
+  --shadow-1: 0 1px 2px rgba(13,27,36,.06), 0 2px 8px rgba(13,27,36,.05);
+  --shadow-2: 0 2px 6px rgba(13,27,36,.09), 0 12px 32px rgba(13,27,36,.10);
+
+  --r-sm: 4px; --r-md: 7px; --r-lg: 12px;
+
+  --font-display: "Bahnschrift", "DIN Alternate", "Oswald", "Segoe UI Semibold",
+                  "Helvetica Neue", system-ui, sans-serif;
+  --font-body:    "Segoe UI Variable Text", "Segoe UI", Inter, -apple-system,
+                  BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:    "Cascadia Mono", "Consolas", "SF Mono", "JetBrains Mono",
+                  ui-monospace, monospace;
+
+  --header-h: 56px;
+  --footer-h: 30px;
+}
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#080d11; --chrome:#101a20; --chrome-2:#16232a; --chrome-3:#1d2c34;
+    --rule:#243740; --rule-soft:#1b2930;
+    --ink:#e4eef2; --ink-2:#9db2bc; --ink-3:#6c848f;
+    --sig-hospital:#f0687e; --sig-farmacia:#35c893; --sig-lab:#9c8bff; --sig-ubs:#dda253;
+    --accent:#2bb4bf; --accent-soft:#0d3c42;
+    --map-bg:#0b1216; --map-block:#111a1e; --map-minor:#2a3a41; --map-minor-c:#151f24;
+    --map-major:#3d5058; --map-major-c:#141e23; --map-park:#16301f; --map-park-l:#5f9a6d;
+    --map-bairro:#8fb7c4; --map-label:#84999f;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-2: 0 2px 6px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#080d11; --chrome:#101a20; --chrome-2:#16232a; --chrome-3:#1d2c34;
+  --rule:#243740; --rule-soft:#1b2930;
+  --ink:#e4eef2; --ink-2:#9db2bc; --ink-3:#6c848f;
+  --sig-hospital:#f0687e; --sig-farmacia:#35c893; --sig-lab:#9c8bff; --sig-ubs:#dda253;
+  --accent:#2bb4bf; --accent-soft:#0d3c42;
+  --map-bg:#0b1216; --map-block:#111a1e; --map-minor:#2a3a41; --map-minor-c:#151f24;
+  --map-major:#3d5058; --map-major-c:#141e23; --map-park:#16301f; --map-park-l:#5f9a6d;
+  --map-bairro:#8fb7c4; --map-label:#84999f;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 2px 6px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.45);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font-body); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+button,input,select,textarea{ font:inherit; color:inherit; }
+button{ cursor:pointer; background:none; border:none; }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
+
+/* ---------- micro-tipografia utilitária ---------- */
+.eyebrow{
+  font-family:var(--font-display); font-size:10px; font-weight:600;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3);
+}
+.num{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+
+/* ============================ ESQUELETO ============================ */
+.app{ height:100vh; display:grid; grid-template-rows:var(--header-h) 1fr var(--footer-h); }
+
+/* ---------- cabeçalho ---------- */
+.hdr{
+  display:flex; align-items:center; gap:18px; padding:0 14px;
+  background:var(--chrome); border-bottom:1px solid var(--rule);
+  z-index:40; position:relative;
+}
+.brand{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.brand svg{ display:block; }
+.brand b{
+  font-family:var(--font-display); font-size:17px; font-weight:600;
+  letter-spacing:.055em; text-transform:uppercase; line-height:1;
+}
+.brand span{ display:block; font-size:9.5px; letter-spacing:.13em; color:var(--ink-3);
+  text-transform:uppercase; font-family:var(--font-display); margin-top:2px; }
+
+.tabs{ display:flex; gap:2px; margin-left:6px; }
+.tab{
+  font-family:var(--font-display); font-size:11.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-2); padding:7px 12px;
+  border-radius:var(--r-sm); position:relative; white-space:nowrap;
+}
+.tab:hover{ background:var(--chrome-2); color:var(--ink); }
+.tab[aria-selected="true"]{ color:var(--ink); background:var(--chrome-3); }
+.tab[aria-selected="true"]::after{
+  content:""; position:absolute; left:12px; right:12px; bottom:-9px; height:2px;
+  background:var(--accent);
+}
+.hdr-spacer{ flex:1; }
+.hdr-tools{ display:flex; align-items:center; gap:6px; }
+.icon-btn{
+  width:32px; height:32px; display:grid; place-items:center; border-radius:var(--r-sm);
+  color:var(--ink-2); border:1px solid transparent;
+}
+.icon-btn:hover{ background:var(--chrome-2); color:var(--ink); border-color:var(--rule); }
+
+/* ---------- rodapé / barra de estado ---------- */
+.foot{
+  display:flex; align-items:center; gap:0; padding:0 12px;
+  background:var(--chrome); border-top:1px solid var(--rule);
+  font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3);
+  letter-spacing:.02em; overflow:hidden;
+}
+.foot > *{ padding:0 12px; border-right:1px solid var(--rule-soft); white-space:nowrap; }
+.foot > *:first-child{ padding-left:0; }
+.foot > *:last-child{ border-right:none; }
+.foot .grow{ flex:1; border:none; text-align:right; color:var(--ink-2); }
+.foot b{ color:var(--ink-2); font-weight:600; }
+
+/* ---------- corpo ---------- */
+.body{ position:relative; min-height:0; }
+.view{ position:absolute; inset:0; }
+.view[hidden]{ display:none; }
+
+/* ============================ VISTA: MAPA ============================ */
+#view-map:not([hidden]){ display:grid; grid-template-columns:308px minmax(0,1fr) 372px; }
+.panel{
+  background:var(--chrome); display:flex; flex-direction:column; min-height:0;
+  min-width:0;
+}
+.panel--left{ border-right:1px solid var(--rule); }
+.panel--right{ border-left:1px solid var(--rule); }
+.panel-scroll{ overflow-y:auto; overflow-x:hidden; flex:1; min-height:0; scrollbar-width:thin; }
+.panel-scroll::-webkit-scrollbar{ width:9px; }
+.panel-scroll::-webkit-scrollbar-thumb{ background:var(--rule); border-radius:9px;
+  border:3px solid var(--chrome); }
+
+section.block{ border-bottom:1px solid var(--rule-soft); padding:14px 16px 16px; }
+section.block:last-child{ border-bottom:none; }
+.block-hd{ display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; }
+.block-hd h2{ margin:0; font-family:var(--font-display); font-size:11px; font-weight:600;
+  letter-spacing:.15em; text-transform:uppercase; color:var(--ink-2); }
+
+/* selo de tipo de geometria — informação real, não enfeite */
+.geom{
+  font-family:var(--font-mono); font-size:9px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--ink-3); border:1px solid var(--rule); border-radius:2px; padding:1px 5px;
+  display:inline-flex; align-items:center; gap:4px; line-height:1.5;
+}
+.geom i{ font-style:normal; font-size:10px; }
+
+/* ---------- controles ---------- */
+label.fld{ display:block; margin-bottom:12px; }
+label.fld:last-child{ margin-bottom:0; }
+label.fld > span{ display:block; margin-bottom:5px; font-size:11px; color:var(--ink-2);
+  font-weight:600; letter-spacing:.02em; }
+select,input[type="text"],input[type="number"]{
+  width:100%; padding:8px 10px; background:var(--chrome-2); color:var(--ink);
+  border:1px solid var(--rule); border-radius:var(--r-md); font-size:13px;
+  appearance:none;
+}
+select{
+  background-image:linear-gradient(45deg,transparent 50%,var(--ink-3) 50%),
+                   linear-gradient(135deg,var(--ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 15px, calc(100% - 10px) 15px;
+  background-size:5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:30px;
+}
+select:hover,input:hover{ border-color:var(--ink-3); }
+select:focus,input:focus{ outline:none; border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft); }
+
+.chips{ display:flex; flex-wrap:wrap; gap:5px; }
+.chip{
+  font-family:var(--font-mono); font-size:11px; padding:5px 9px; border-radius:var(--r-sm);
+  border:1px solid var(--rule); background:var(--chrome-2); color:var(--ink-2);
+  transition:background .12s, color .12s, border-color .12s;
+}
+.chip:hover{ border-color:var(--ink-3); color:var(--ink); }
+.chip[aria-pressed="true"]{
+  background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;
+}
+:root[data-theme="dark"] .chip[aria-pressed="true"],
+:root:not([data-theme="light"]) .chip[aria-pressed="true"]{ color:#04191c; }
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]) .chip[aria-pressed="true"]{ color:#fff; }
+}
+
+input[type="range"]{ width:100%; accent-color:var(--accent); margin:6px 0 0; }
+
+/* ---------- categorias (com semiologia) ---------- */
+.cat{
+  display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:var(--r-md);
+  cursor:pointer; user-select:none; border:1px solid transparent;
+}
+.cat:hover{ background:var(--chrome-2); }
+.cat input{ appearance:none; width:15px; height:15px; border:1.5px solid var(--rule);
+  border-radius:3px; display:grid; place-items:center; flex-shrink:0; cursor:pointer;
+  background:var(--chrome); }
+.cat input:checked{ background:var(--c); border-color:var(--c); }
+.cat input:checked::after{ content:""; width:7px; height:4px; border:2px solid #fff;
+  border-top:0; border-right:0; transform:rotate(-45deg) translate(0,-1px); }
+.cat .sw{ width:11px; height:11px; border-radius:50%; background:var(--c); flex-shrink:0;
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--c) 22%, transparent); }
+.cat .nm{ flex:1; font-size:13px; }
+.cat .ct{ font-family:var(--font-mono); font-size:11px; color:var(--ink-3); }
+
+/* ---------- console de consulta espacial (ELEMENTO-ASSINATURA) ---------- */
+.console{
+  background:var(--chrome-3); border:1px solid var(--rule); border-radius:var(--r-md);
+  padding:10px 11px; font-family:var(--font-mono); font-size:11px; line-height:1.75;
+  color:var(--ink-2); overflow-x:auto; position:relative;
+}
+.console .kw{ color:var(--accent); font-weight:600; }
+.console .fn{ color:var(--sig-lab); font-weight:600; }
+.console .st{ color:var(--sig-farmacia); }
+.console .nm2{ color:var(--ink); font-weight:600; }
+.console .cm{ color:var(--ink-3); font-style:italic; }
+
+.pred{ display:flex; flex-direction:column; gap:1px; margin-top:10px; }
+.pred-row{
+  display:grid; grid-template-columns:auto 1fr auto; gap:9px; align-items:center;
+  padding:7px 2px; border-top:1px solid var(--rule-soft); font-size:12px;
+}
+.pred-row:first-child{ border-top:none; }
+.pred-op{ font-family:var(--font-mono); font-size:10px; color:var(--accent);
+  background:var(--accent-soft); padding:2px 5px; border-radius:2px; letter-spacing:.02em; }
+.pred-txt{ color:var(--ink-2); min-width:0; }
+.pred-txt b{ color:var(--ink); font-weight:600; }
+.pred-val{ font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--ink); }
+
+/* ---------- botão principal ---------- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  padding:9px 14px; border-radius:var(--r-md); font-family:var(--font-display);
+  font-size:12px; letter-spacing:.1em; text-transform:uppercase; font-weight:600;
+  border:1px solid var(--rule); background:var(--chrome-2); color:var(--ink);
+  transition:background .12s, border-color .12s, transform .06s;
+}
+.btn:hover{ background:var(--chrome-3); border-color:var(--ink-3); }
+.btn:active{ transform:translateY(1px); }
+.btn--go{ background:var(--accent); border-color:var(--accent); color:#fff; width:100%; }
+.btn--go:hover{ filter:brightness(1.08); background:var(--accent); border-color:var(--accent); }
+:root[data-theme="dark"] .btn--go{ color:#04191c; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .btn--go{ color:#04191c; } }
+.btn--sm{ padding:6px 10px; font-size:11px; letter-spacing:.07em; }
+
+/* ============================ MAPA ============================ */
+.stage{ position:relative; background:var(--map-bg); overflow:hidden; min-width:0; }
+#map{ position:absolute; inset:0; width:100%; height:100%; display:block;
+  cursor:grab; touch-action:none; }
+#map.dragging{ cursor:grabbing; }
+#map text{ pointer-events:none; user-select:none; }
+
+.map-block{ fill:var(--map-block); }
+.mn{ stroke:var(--map-minor); }
+.mn-c{ stroke:var(--map-minor-c); }
+.mj{ stroke:var(--map-major); }
+.mj-c{ stroke:var(--map-major-c); }
+.park{ fill:var(--map-park); stroke:var(--map-park-l); stroke-opacity:.4; }
+.park-l{ fill:var(--map-park-l); font-size:9px; font-style:italic;
+  font-family:var(--font-body); }
+.bairro{ fill:var(--map-bairro); fill-opacity:.045; stroke:var(--map-bairro);
+  stroke-opacity:.26; stroke-width:1; stroke-dasharray:5 4; }
+.bairro.hit{ fill-opacity:.10; stroke-opacity:.55; stroke-dasharray:none; }
+.bairro-l{ fill:var(--map-bairro); fill-opacity:.62; font-family:var(--font-display);
+  font-size:10px; letter-spacing:.19em; text-transform:uppercase; text-anchor:middle; }
+.street-l{ fill:var(--map-label); font-size:9.5px; font-family:var(--font-body);
+  font-weight:600; letter-spacing:.02em; }
+
+.buffer{ fill:var(--accent); fill-opacity:.075; stroke:var(--accent); stroke-width:1.6;
+  stroke-dasharray:7 5; }
+.buffer-run{ animation:sweep .75s ease-out; }
+@keyframes sweep{ from{ stroke-dashoffset:900; opacity:.15 } to{ stroke-dashoffset:0; opacity:1 } }
+.radius-tick{ stroke:var(--accent); stroke-width:1.3; stroke-dasharray:3 3; }
+.radius-l{ fill:var(--accent); font-family:var(--font-mono); font-size:10px; font-weight:700; }
+.radius-l-bg{ fill:var(--map-bg); }
+
+.route{ stroke:var(--ink); stroke-width:2.2; stroke-dasharray:8 5; fill:none;
+  stroke-linecap:round; opacity:.85; animation:march 1.4s linear infinite; }
+@keyframes march{ to{ stroke-dashoffset:-26 } }
+
+.mk{ cursor:pointer; }
+.mk-halo{ fill:var(--c); opacity:0; transition:opacity .15s; }
+.mk.on .mk-halo, .mk:hover .mk-halo{ opacity:.22; }
+.mk-dot{ fill:var(--c); stroke:var(--chrome); stroke-width:1.8; }
+.mk.on .mk-dot{ stroke-width:2.6; }
+.mk-rank{ fill:#fff; font-family:var(--font-mono); font-size:8.5px; font-weight:700;
+  text-anchor:middle; }
+.mk-l{ fill:var(--ink); font-size:10px; font-weight:600; paint-order:stroke;
+  stroke:var(--map-bg); stroke-width:3.2; stroke-linejoin:round; }
+.hosp-pin{ fill:var(--sig-hospital); stroke:var(--chrome); stroke-width:2; }
+.hosp-cross{ stroke:#fff; stroke-width:2.2; stroke-linecap:round; }
+.dim{ opacity:.28; }
+
+@media (prefers-reduced-motion: reduce){
+  .buffer-run{ animation:none } .route{ animation:none } *{ scroll-behavior:auto }
+}
+
+/* ---------- sobreposições do mapa ---------- */
+.ov{ position:absolute; z-index:10; }
+.ov-tl{ top:12px; left:12px; }
+.ov-tr{ top:12px; right:12px; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+.ov-bl{ bottom:12px; left:12px; }
+.ov-br{ bottom:12px; right:12px; }
+
+.zoomer{ background:var(--chrome); border:1px solid var(--rule); border-radius:var(--r-md);
+  box-shadow:var(--shadow-1); overflow:hidden; display:flex; flex-direction:column; }
+.zoomer button{ width:32px; height:31px; display:grid; place-items:center; color:var(--ink-2);
+  font-size:15px; font-family:var(--font-mono); }
+.zoomer button:hover{ background:var(--chrome-2); color:var(--ink); }
+.zoomer button + button{ border-top:1px solid var(--rule-soft); }
+
+.legend{
+  background:color-mix(in srgb, var(--chrome) 93%, transparent);
+  backdrop-filter:blur(8px); border:1px solid var(--rule); border-radius:var(--r-md);
+  box-shadow:var(--shadow-1); padding:9px 11px; max-width:230px;
+}
+.legend h3{ margin:0 0 7px; font-family:var(--font-display); font-size:9.5px;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); font-weight:600; }
+.legend ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
+.legend li{ display:flex; align-items:center; gap:7px; font-size:11px; color:var(--ink-2); }
+.legend .k{ width:15px; display:grid; place-items:center; flex-shrink:0; }
+
+.scalebar{ display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  font-family:var(--font-mono); font-size:10px; color:var(--ink-2);
+  background:color-mix(in srgb, var(--chrome) 88%, transparent); padding:4px 7px;
+  border-radius:var(--r-sm); border:1px solid var(--rule); }
+.scalebar .bar{ height:5px; border:1.4px solid var(--ink-2); border-top:none; }
+
+.toast{
+  position:absolute; left:50%; bottom:22px; transform:translateX(-50%);
+  background:var(--ink); color:var(--paper); padding:9px 15px; border-radius:var(--r-md);
+  font-size:12.5px; box-shadow:var(--shadow-2); z-index:30; max-width:80%;
+  opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+}
+.toast.on{ opacity:1; transform:translateX(-50%) translateY(-4px); }
+
+/* ---------- cartão de detalhe (popup) ---------- */
+.popup{
+  position:absolute; z-index:25; width:262px; background:var(--chrome);
+  border:1px solid var(--rule); border-radius:var(--r-lg); box-shadow:var(--shadow-2);
+  overflow:hidden;
+}
+.popup[hidden]{ display:none; }
+.popup-hd{ padding:11px 13px 9px; border-bottom:1px solid var(--rule-soft);
+  border-top:3px solid var(--c); }
+.popup-hd h4{ margin:0 0 3px; font-size:14px; font-weight:650; line-height:1.28; }
+.popup-hd .sub{ font-size:11px; color:var(--ink-3); }
+.popup-bd{ padding:10px 13px; display:flex; flex-direction:column; gap:7px; font-size:12px; }
+.popup-row{ display:grid; grid-template-columns:74px 1fr; gap:8px; color:var(--ink-2); }
+.popup-row b{ color:var(--ink-3); font-weight:600; font-size:10.5px; letter-spacing:.05em;
+  text-transform:uppercase; padding-top:1px; font-family:var(--font-display); }
+.popup-ft{ display:flex; gap:6px; padding:0 13px 12px; }
+.popup-close{ position:absolute; top:8px; right:8px; width:22px; height:22px;
+  display:grid; place-items:center; border-radius:4px; color:var(--ink-3); font-size:15px;
+  line-height:1; }
+.popup-close:hover{ background:var(--chrome-2); color:var(--ink); }
+
+/* ============================ RESULTADOS ============================ */
+.res-hd{ padding:13px 16px 11px; border-bottom:1px solid var(--rule); }
+.res-count{ display:flex; align-items:baseline; gap:8px; margin-bottom:11px; }
+.res-count strong{ font-family:var(--font-display); font-size:27px; font-weight:600;
+  line-height:1; letter-spacing:-.01em; }
+.res-count span{ font-size:11.5px; color:var(--ink-2); line-height:1.3; }
+.sorters{ display:flex; gap:3px; background:var(--chrome-2); padding:3px;
+  border-radius:var(--r-md); border:1px solid var(--rule); }
+.sorters button{ flex:1; padding:5px 4px; border-radius:var(--r-sm); font-size:11px;
+  color:var(--ink-2); font-weight:600; white-space:nowrap; }
+.sorters button:hover{ color:var(--ink); }
+.sorters button[aria-pressed="true"]{ background:var(--chrome); color:var(--ink);
+  box-shadow:var(--shadow-1); }
+
+.res-list{ list-style:none; margin:0; padding:0; }
+.res-item{
+  display:grid; grid-template-columns:30px 1fr auto; gap:11px; align-items:start;
+  padding:11px 16px; border-bottom:1px solid var(--rule-soft); cursor:pointer;
+  border-left:3px solid transparent; transition:background .1s;
+}
+.res-item:hover{ background:var(--chrome-2); }
+.res-item.on{ background:var(--chrome-2); border-left-color:var(--c); }
+.res-rank{
+  width:24px; height:24px; border-radius:50%; background:var(--c); color:#fff;
+  display:grid; place-items:center; font-family:var(--font-mono); font-size:10.5px;
+  font-weight:700; margin-top:1px;
+}
+.res-main{ min-width:0; }
+.res-name{ font-size:13.5px; font-weight:600; line-height:1.3; margin-bottom:2px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.res-addr{ font-size:11.5px; color:var(--ink-3); overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.res-tags{ display:flex; gap:4px; margin-top:5px; flex-wrap:wrap; }
+.tag{ font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; font-weight:600;
+  padding:2px 5px; border-radius:2px; background:var(--chrome-3); color:var(--ink-2);
+  font-family:var(--font-display); }
+.tag--hi{ background:color-mix(in srgb, var(--c) 15%, transparent); color:var(--c); }
+.res-dist{ text-align:right; padding-top:2px; }
+.res-dist .d{ font-family:var(--font-mono); font-size:14px; font-weight:700;
+  font-variant-numeric:tabular-nums; line-height:1.1; }
+.res-dist .u{ font-family:var(--font-mono); font-size:9.5px; color:var(--ink-3);
+  font-weight:600; margin-left:2px; }
+.res-dist .w{ font-size:10px; color:var(--ink-3); margin-top:3px; white-space:nowrap; }
+
+.empty{ padding:44px 26px; text-align:center; color:var(--ink-3); }
+.empty svg{ margin-bottom:12px; opacity:.5; }
+.empty p{ margin:0 0 4px; font-size:13px; color:var(--ink-2); font-weight:600; }
+.empty small{ font-size:11.5px; line-height:1.5; display:block; }
+
+/* ============================ VISTAS DE DOCUMENTAÇÃO ============================ */
+.doc{ height:100%; overflow-y:auto; background:var(--paper); }
+.doc-inner{ max-width:1180px; margin:0 auto; padding:38px 30px 90px; }
+.doc h1{ font-family:var(--font-display); font-size:30px; font-weight:600; margin:0 0 6px;
+  letter-spacing:-.005em; }
+.doc .lede{ color:var(--ink-2); font-size:14.5px; max-width:70ch; margin:0 0 30px; }
+.doc h2{ font-family:var(--font-display); font-size:14px; letter-spacing:.13em;
+  text-transform:uppercase; color:var(--ink-2); margin:38px 0 14px; padding-bottom:8px;
+  border-bottom:1px solid var(--rule); font-weight:600; }
+.doc h3{ font-size:15px; margin:26px 0 8px; font-weight:650; }
+.doc p{ max-width:76ch; }
+.doc-figure{ background:var(--chrome); border:1px solid var(--rule); border-radius:var(--r-lg);
+  padding:16px; overflow-x:auto; box-shadow:var(--shadow-1); }
+.doc-figure svg{ display:block; margin:0 auto; min-width:940px; }
+figcaption{ font-size:11.5px; color:var(--ink-3); margin-top:11px; text-align:center;
+  font-family:var(--font-mono); }
+
+.uc-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); }
+.uc{ background:var(--chrome); border:1px solid var(--rule); border-radius:var(--r-lg);
+  overflow:hidden; box-shadow:var(--shadow-1); }
+.uc-hd{ padding:12px 15px; border-bottom:1px solid var(--rule); display:flex;
+  align-items:center; gap:10px; background:var(--chrome-2); }
+.uc-id{ font-family:var(--font-mono); font-size:11px; font-weight:700; color:#fff;
+  background:var(--accent); padding:3px 7px; border-radius:3px; flex-shrink:0; }
+:root[data-theme="dark"] .uc-id{ color:#04191c; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .uc-id{ color:#04191c; } }
+.uc-hd h3{ margin:0; font-size:14px; font-weight:650; }
+.uc table{ width:100%; border-collapse:collapse; }
+.uc th,.uc td{ text-align:left; vertical-align:top; padding:9px 15px;
+  border-bottom:1px solid var(--rule-soft); font-size:12.5px; }
+.uc tr:last-child th,.uc tr:last-child td{ border-bottom:none; }
+.uc th{ width:120px; font-family:var(--font-display); font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:600; padding-top:11px; }
+.uc td{ color:var(--ink-2); }
+.uc ol,.uc ul{ margin:0; padding-left:17px; }
+.uc li{ margin-bottom:3px; }
+.uc code{ font-family:var(--font-mono); font-size:11px; background:var(--chrome-3);
+  padding:1px 4px; border-radius:2px; color:var(--ink); }
+
+.rel-tbl{ width:100%; border-collapse:collapse; background:var(--chrome);
+  border:1px solid var(--rule); border-radius:var(--r-lg); overflow:hidden;
+  box-shadow:var(--shadow-1); }
+.rel-tbl th,.rel-tbl td{ text-align:left; padding:9px 14px;
+  border-bottom:1px solid var(--rule-soft); font-size:12.5px; }
+.rel-tbl thead th{ background:var(--chrome-2); font-family:var(--font-display);
+  font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); }
+.rel-tbl tr:last-child td{ border-bottom:none; }
+.rel-tbl code{ font-family:var(--font-mono); font-size:11px; }
+
+.note{ background:var(--chrome); border:1px solid var(--rule);
+  border-left:3px solid var(--accent); border-radius:var(--r-md); padding:12px 15px;
+  font-size:12.5px; color:var(--ink-2); margin:18px 0; max-width:76ch; }
+.note b{ color:var(--ink); }
+
+/* ---------- notação do diagrama ---------- */
+.d-boundary{ fill:none; stroke:var(--ink-3); stroke-width:1.3; }
+.d-boundary-bg{ fill:var(--chrome-2); }
+.d-title{ fill:var(--ink); font-family:var(--font-display); font-size:13px;
+  letter-spacing:.11em; text-transform:uppercase; text-anchor:middle; font-weight:600; }
+.d-uc{ fill:var(--chrome); stroke:var(--ink-2); stroke-width:1.2; }
+.d-uc--core{ fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.7; }
+.d-uc--abs{ stroke-dasharray:none; }
+.d-t{ fill:var(--ink); font-family:var(--font-body); font-size:11px; text-anchor:middle; }
+.d-t--sm{ font-size:10px; }
+.d-t--it{ font-style:italic; fill:var(--ink-2); font-size:9.5px; }
+.d-actor{ fill:none; stroke:var(--ink); stroke-width:1.5; stroke-linecap:round; }
+.d-actor-t{ fill:var(--ink); font-family:var(--font-body); font-size:11px; font-weight:600;
+  text-anchor:middle; }
+.d-assoc{ stroke:var(--ink-2); stroke-width:1.2; fill:none; }
+.d-dash{ stroke:var(--ink-2); stroke-width:1.2; stroke-dasharray:6 4; fill:none; }
+.d-gen{ stroke:var(--ink-2); stroke-width:1.2; fill:none; }
+.d-stereo{ fill:var(--ink-2); font-family:var(--font-mono); font-size:9px; text-anchor:middle; }
+.d-legend{ fill:var(--chrome); stroke:var(--rule); stroke-width:1; }
+
+/* ============================ RESPONSIVO ============================ */
+@media (max-width:1240px){
+  #view-map{ grid-template-columns:272px minmax(0,1fr) 320px; }
+}
+@media (max-width:1000px){
+  body{ overflow:auto; }
+  .app{ height:auto; min-height:100vh; grid-template-rows:auto 1fr auto; }
+  .hdr{ flex-wrap:wrap; height:auto; padding:9px 12px; gap:10px; }
+  .tabs{ order:3; width:100%; overflow-x:auto; }
+  .body{ position:static; }
+  .view{ position:static; }
+  #view-map:not([hidden]){ display:block; }
+  .panel{ border:none; border-bottom:1px solid var(--rule); }
+  .panel--right{ border-left:none; }
+  .panel-scroll{ overflow:visible; }
+  .stage{ height:62vh; min-height:400px; position:relative; }
+  .doc{ height:auto; overflow:visible; }
+  .doc-inner{ padding:26px 18px 70px; }
+  .uc-grid{ grid-template-columns:1fr; }
+  .foot{ display:none; }
+}
+@media (max-width:560px){
+  .doc h1{ font-size:23px; }
+  .uc th{ width:96px; font-size:9px; }
+  .uc th,.uc td{ padding:8px 11px; font-size:12px; }
+  .res-item{ padding:10px 12px; }
+  .legend{ display:none; }
+}
+</style>
+<style>
+/* ================== ajustes exclusivos de impressao ================== */
+@page { size: A4 portrait; margin: 16mm 14mm 16mm 14mm; }
+
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { overflow: visible; background: #fff; font-size: 11.5pt; }
+
+.doc        { height: auto; overflow: visible; background: #fff; }
+.doc-inner  { max-width: none; margin: 0; padding: 0; }
+.doc h1     { font-size: 24pt; margin-bottom: 4mm; }
+.doc .lede  { font-size: 11pt; max-width: none; margin-bottom: 8mm; }
+.doc h2     { font-size: 11pt; margin: 9mm 0 4mm; break-after: avoid; }
+.doc p      { max-width: none; }
+
+/* folha de rosto reduzida: identifica o entregavel sem gastar uma pagina */
+.sheet-hd { border-bottom: 2px solid var(--ink); padding-bottom: 3mm; margin-bottom: 7mm;
+            display: flex; justify-content: space-between; align-items: baseline; gap: 8mm; }
+.sheet-hd .who { font-family: var(--font-display); font-size: 9pt; letter-spacing: .14em;
+                 text-transform: uppercase; color: var(--ink-2); }
+.sheet-hd .sys { font-family: var(--font-mono); font-size: 8.5pt; color: var(--ink-3);
+                 text-align: right; line-height: 1.5; }
+
+/* nada de rolagem horizontal: figura e tabelas dimensionam para a folha */
+.doc-figure       { padding: 4mm; overflow: visible; box-shadow: none; break-inside: avoid; }
+.doc-figure svg   { min-width: 0; width: 100%; height: auto; }
+
+/* uma coluna: as tabelas de caso de uso ficam legiveis em A4 retrato */
+.uc-grid { display: block; }
+.uc      { break-inside: avoid; margin-bottom: 6mm; box-shadow: none; }
+.uc-hd   { padding: 3mm 4mm; }
+.uc-hd h3{ font-size: 12pt; }
+.uc th, .uc td { padding: 2.4mm 4mm; font-size: 10pt; }
+.uc th   { width: 30mm; font-size: 8pt; }
+
+.rel-tbl { box-shadow: none; break-inside: auto; }
+.rel-tbl th, .rel-tbl td { padding: 2.2mm 3mm; font-size: 9.5pt; }
+.rel-tbl tr { break-inside: avoid; }
+
+.note { break-inside: avoid; max-width: none; font-size: 10pt; padding: 3mm 4mm; }
+figcaption { font-size: 8.5pt; }
+
+/* o indice do entregavel 2 nao serve em papel: os cartoes ja vem em ordem */
+#uc-index { display: none; }
+</style>
+</head>
+<body>
+<div class="doc"><div class="doc-inner">
+  <div class="sheet-hd">
+    <div class="who">Engenharia de Software II<br>Entreg&aacute;vel 2 &middot; Especifica&ccedil;&atilde;o textual</div>
+    <div class="sys">GeoSa&uacute;de BH &middot; prot&oacute;tipo WebGIS<br>github.com/pedroleitep/WebGIS</div>
+  </div>
+
+  <span class="eyebrow">Entregável 2</span>
+  <h1>Especificação textual dos casos de uso</h1>
+  <p class="lede">Uma tabela por caso de uso do diagrama, no formato exigido: nome, descrição,
+     fluxo principal, fluxos alternativos, pré-condições e pós-condições.</p>
+
+  <div class="uc-grid">
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC01</span><h3>Localizar serviços de saúde próximos</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Caso de uso base (abstrato). Permite ao Usuário do Sistema encontrar estabelecimentos de saúde situados dentro de um raio a partir de um hospital de referência, com o resultado apresentado em lista ordenada e no mapa.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O usuário abre o sistema e o mapa da região central é carregado (<code>«include» UC10</code>).</li>
+       <li>O usuário seleciona o hospital de referência (<code>«include» UC04</code>).</li>
+       <li>O usuário define o raio de busca (<code>«include» UC05</code>).</li>
+       <li>O usuário escolhe a categoria e os filtros de atributo (<code>«include» UC06</code>).</li>
+       <li>O usuário aciona <i>Executar consulta</i>.</li>
+       <li>O sistema executa a consulta espacial sobre a área de busca (<code>«include» UC07</code>).</li>
+       <li>O sistema calcula a distância de cada estabelecimento retornado até o hospital e ordena de forma crescente (<code>«include» UC08</code>).</li>
+       <li>O sistema desenha o polígono do raio, os marcadores numerados e ajusta o enquadramento (<code>«include» UC09</code>).</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Nenhum estabelecimento no raio: o sistema informa a ausência de resultados e sugere ampliar o raio ou relaxar os filtros; retorna ao passo 3.</li>
+       <li><b>A2.</b> O usuário altera raio, categoria ou filtros: o sistema refaz a consulta a partir do passo 5.</li>
+       <li><b>A3.</b> O usuário troca o hospital de referência: o sistema descarta o resultado atual e reinicia do passo 2.</li>
+       <li><b>E1.</b> Base cartográfica indisponível: o sistema exibe apenas as geometrias locais e registra aviso na barra de estado.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Base de hospitais e estabelecimentos carregada; navegador com suporte a SVG.</td></tr>
+     <tr><th>Pós-condições</th><td>Conjunto de resultados calculado, ordenado por distância e sincronizado entre lista e mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC02</span><h3>Localizar farmácias próximas</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Especialização de UC01. Permite ao Familiar do Paciente localizar farmácias em torno do hospital selecionado, para escolher a opção mais conveniente (Estória 1).</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O familiar seleciona o hospital em que o paciente está internado.</li>
+       <li>Define o raio de busca (por exemplo, 500 m).</li>
+       <li>Escolhe a categoria <b>Farmácia</b>; o sistema desmarca as demais categorias.</li>
+       <li>Opcionalmente aplica filtros de atributo: <i>24 horas</i>, <i>entrega</i>, <i>manipulação</i>, <i>aplicação de injetáveis</i>.</li>
+       <li>O sistema seleciona as farmácias contidas na área de busca e calcula a distância de cada uma até o hospital.</li>
+       <li>O sistema exibe a lista ordenada da mais próxima para a mais distante e os marcadores numerados no mapa.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Nenhuma farmácia encontrada no raio: o sistema informa e oferece ampliar o raio.</li>
+       <li><b>A2.</b> O familiar altera o raio e refaz a busca.</li>
+       <li><b>A3.</b> Filtro <i>24 horas</i> zera o conjunto: o sistema mantém o resultado sem o filtro e sinaliza quantos itens foram removidos.</li>
+       <li><b>A4.</b> O familiar pede ordenação alfabética (<code>«extend» UC11</code>).</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Hospital disponível e selecionado no sistema; existir ao menos uma farmácia cadastrada.</td></tr>
+     <tr><th>Pós-condições</th><td>Lista de farmácias exibida em ordem de proximidade, com marcadores correspondentes no mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC03</span><h3>Localizar laboratórios de radiografia próximos</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Especialização de UC01. Permite ao Médico localizar laboratórios que realizam radiografia próximos ao hospital, para encaminhar o paciente ao serviço mais adequado (Estória 2).</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O médico seleciona o hospital de referência.</li>
+       <li>Define o raio de busca (por exemplo, 1 km).</li>
+       <li>Escolhe a categoria <b>Laboratório</b>.</li>
+       <li>Ativa o filtro de exame <b>Radiografia</b>; o sistema descarta laboratórios que não oferecem o exame.</li>
+       <li>Opcionalmente restringe por <i>atende SUS</i> ou <i>plantão 24h</i>.</li>
+       <li>O sistema retorna os laboratórios contidos na área de busca, ordenados por distância.</li>
+       <li>O médico abre o detalhe de um laboratório e consulta exames, telefone e horário (<code>«extend» UC12</code>).</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Nenhum laboratório com radiografia no raio: o sistema informa e sugere ampliar para o próximo raio pré-definido.</li>
+       <li><b>A2.</b> O médico remove o filtro de radiografia para ver todos os laboratórios de análises.</li>
+       <li><b>A3.</b> O médico solicita a rota até o laboratório escolhido (<code>«extend» UC15</code>).</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Hospital selecionado; base de laboratórios com o atributo de exames preenchido.</td></tr>
+     <tr><th>Pós-condições</th><td>Lista de laboratórios de radiografia exibida em ordem de proximidade e plotada no mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC04</span><h3>Selecionar hospital de referência</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Define o ponto (geometria <code>POINT</code>) que serve de origem para o raio de busca e para o cálculo de todas as distâncias.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema apresenta a lista de hospitais cadastrados, com bairro e endereço.</li>
+       <li>O usuário escolhe um hospital na lista ou clica no marcador correspondente no mapa.</li>
+       <li>O sistema centraliza o mapa no hospital, destaca o marcador e exibe suas coordenadas.</li>
+       <li>O sistema identifica o bairro que contém o hospital e o registra no painel de consulta espacial.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário clica em um marcador de hospital diretamente no mapa: equivale ao passo 2.</li>
+       <li><b>A2.</b> Já existe uma consulta ativa: o sistema recalcula os resultados para o novo hospital.</li>
+       <li><b>E1.</b> Hospital sem coordenada válida: o sistema mantém a seleção anterior e sinaliza o erro.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Existir ao menos um hospital cadastrado com latitude e longitude.</td></tr>
+     <tr><th>Pós-condições</th><td>Hospital de referência definido; mapa centralizado; bairro contenedor identificado.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC05</span><h3>Definir raio de busca</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Estabelece a distância máxima, em metros, que delimita a área de busca. O sistema materializa esse raio como um polígono circular (<i>buffer</i>) em torno do hospital.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema exibe os raios pré-definidos de 200 m, 500 m, 1 km e 2 km, além de um controle contínuo.</li>
+       <li>O usuário escolhe um valor pré-definido ou arrasta o controle entre 100 m e 3.000 m.</li>
+       <li>O sistema atualiza o rótulo numérico do raio.</li>
+       <li>O sistema redesenha o polígono de busca, a marca de escala e o rótulo de raio no mapa.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Valor fora do intervalo permitido: o sistema limita ao mínimo ou máximo e avisa o usuário.</li>
+       <li><b>A2.</b> Existe consulta ativa: o resultado é recalculado a cada mudança do raio.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Hospital de referência selecionado (UC04).</td></tr>
+     <tr><th>Pós-condições</th><td>Raio definido e polígono de busca desenhado sobre o mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC06</span><h3>Filtrar por categoria e atributos</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Restringe o conjunto de estabelecimentos por tipo (hospital, farmácia, laboratório, UBS) e por atributos não espaciais, antes ou depois da consulta espacial.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema apresenta as categorias com sua cor de simbologia e a contagem de registros de cada uma.</li>
+       <li>O usuário marca ou desmarca as categorias desejadas.</li>
+       <li>O sistema apresenta os filtros de atributo pertinentes às categorias marcadas.</li>
+       <li>O usuário ativa os filtros desejados (por exemplo, <i>24 horas</i> ou <i>radiografia</i>).</li>
+       <li>O sistema aplica os filtros e atualiza lista, mapa e contadores.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Nenhuma categoria marcada: o sistema esvazia a lista e informa que ao menos uma categoria deve ser selecionada.</li>
+       <li><b>A2.</b> A combinação de filtros não retorna registros: o sistema informa quais filtros eliminaram todos os itens.</li>
+       <li><b>A3.</b> O usuário limpa os filtros de atributo e mantém apenas a categoria.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Base de estabelecimentos carregada com os atributos correspondentes.</td></tr>
+     <tr><th>Pós-condições</th><td>Conjunto de candidatos restrito às categorias e atributos escolhidos.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC07</span><h3>Executar consulta espacial</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Aplica os operadores topológicos entre a área de busca e as camadas de pontos, linhas e polígonos: <code>ST_Contains</code>, <code>ST_Within</code> e <code>ST_Intersects</code>.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema monta o polígono de busca a partir do hospital e do raio.</li>
+       <li><b>Está contido:</b> seleciona os pontos de estabelecimento cuja geometria está contida no polígono de busca.</li>
+       <li><b>Contém:</b> identifica o polígono de bairro que contém o hospital e verifica quais bairros contêm integralmente a área de busca.</li>
+       <li><b>Intercepta:</b> seleciona as vias (linhas) e os bairros (polígonos) que interceptam a área de busca.</li>
+       <li>O sistema calcula a distância de cada estabelecimento selecionado ao hospital pela fórmula de Haversine.</li>
+       <li>O sistema exibe a consulta em notação pseudo-SQL e o resumo de cada predicado no painel de consulta espacial.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O predicado <i>está contido</i> retorna conjunto vazio: os demais predicados continuam sendo apresentados.</li>
+       <li><b>A2.</b> A área de busca ultrapassa a extensão da base carregada: o sistema avisa que o resultado pode estar incompleto.</li>
+       <li><b>E1.</b> Geometria inválida na base: o registro é ignorado e contabilizado como inconsistência.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Hospital (UC04), raio (UC05) e filtros (UC06) definidos.</td></tr>
+     <tr><th>Pós-condições</th><td>Conjunto-resposta calculado com distâncias e resultado dos três predicados topológicos disponível.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC08</span><h3>Listar resultados por proximidade</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Apresenta os estabelecimentos retornados em lista ordenada pela menor distância até o hospital, com posição, distância e tempo estimado de caminhada.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema ordena o conjunto-resposta pela distância crescente.</li>
+       <li>O sistema atribui a cada item uma posição sequencial, que é a mesma exibida no marcador do mapa.</li>
+       <li>Para cada item exibe nome, endereço, distância em metros, tempo de caminhada estimado e os atributos em destaque.</li>
+       <li>O sistema informa o total de estabelecimentos encontrados.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Conjunto vazio: o sistema exibe estado vazio com orientação para ampliar o raio ou revisar os filtros.</li>
+       <li><b>A2.</b> O usuário troca a ordenação para alfabética (<code>«extend» UC11</code>); as posições numéricas continuam refletindo a proximidade.</li>
+       <li><b>A3.</b> O usuário exporta a lista (<code>«extend» UC13</code>).</li>
+       <li><b>A4.</b> Empate de distância: o sistema desempata por ordem alfabética do nome.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Consulta espacial executada (UC07).</td></tr>
+     <tr><th>Pós-condições</th><td>Lista ordenada exibida e sincronizada com os marcadores do mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC09</span><h3>Visualizar resultados no mapa</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Desenha no mapa o hospital, o polígono do raio e os estabelecimentos encontrados, mantendo a simbologia por categoria e a sincronia com a lista.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema desenha as camadas de fundo: bairros (polígonos), áreas verdes (polígonos) e malha viária (linhas).</li>
+       <li>Desenha o polígono do raio com a marca e o rótulo da distância.</li>
+       <li>Plota o hospital com símbolo próprio e os estabelecimentos com a cor da sua categoria e a posição da lista.</li>
+       <li>Ajusta o enquadramento para que a área de busca fique inteiramente visível.</li>
+       <li>Ao passar o cursor sobre um item da lista, destaca o marcador correspondente, e vice-versa.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário navega no mapa com arrastar, roda do mouse ou botões de zoom.</li>
+       <li><b>A2.</b> O usuário altera as camadas visíveis (<code>«extend» UC14</code>).</li>
+       <li><b>A3.</b> O usuário clica em um marcador e abre o detalhe (<code>«extend» UC12</code>).</li>
+       <li><b>A4.</b> Muitos marcadores sobrepostos: os rótulos são omitidos em escalas menores, preservando os símbolos.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Base cartográfica carregada (UC10) e consulta executada (UC07).</td></tr>
+     <tr><th>Pós-condições</th><td>Mapa renderizado com a área de busca e os resultados; lista e mapa sincronizados.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC10</span><h3>Carregar base cartográfica</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Obtém junto ao Provedor de Geodados as camadas de referência — limites de bairro, malha viária e áreas verdes — e as prepara para renderização.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema solicita as camadas de referência da área central de Belo Horizonte.</li>
+       <li>O Provedor de Geodados devolve as geometrias em coordenadas geográficas (EPSG:4326).</li>
+       <li>O sistema projeta as geometrias para Web Mercator e monta o índice de desenho.</li>
+       <li>O sistema informa na barra de estado a quantidade de feições carregadas por camada.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>E1.</b> Provedor indisponível: o sistema usa a base local embarcada e sinaliza o modo degradado.</li>
+       <li><b>E2.</b> Geometria fora da área de interesse: é descartada no recorte.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Aplicação iniciada no navegador.</td></tr>
+     <tr><th>Pós-condições</th><td>Camadas de referência disponíveis para desenho e para os operadores topológicos.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC11</span><h3>Ordenar resultados alfabeticamente</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC08. Reordena a lista pelo nome do estabelecimento, em ordem crescente ou decrescente, sem alterar o conjunto retornado pela consulta.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>No ponto de extensão <i>ordenação</i>, o usuário escolhe <b>A → Z</b> ou <b>Z → A</b>.</li>
+       <li>O sistema reordena a lista pelo nome, ignorando maiúsculas e acentuação.</li>
+       <li>O sistema mantém em cada item a posição de proximidade e a distância, para que a referência espacial não se perca.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário retorna à ordenação por proximidade.</li>
+       <li><b>A2.</b> Nomes idênticos: desempate pela distância crescente.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Lista de resultados exibida (UC08) com ao menos dois itens.</td></tr>
+     <tr><th>Pós-condições</th><td>Lista reordenada alfabeticamente, com o mesmo conjunto de estabelecimentos.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC12</span><h3>Ver detalhes do estabelecimento</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC09. Exibe a ficha completa de um estabelecimento selecionado na lista ou no mapa.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O usuário clica no marcador do mapa ou no item da lista.</li>
+       <li>O sistema abre o cartão de detalhe junto ao marcador e destaca o item correspondente na lista.</li>
+       <li>O cartão apresenta nome, categoria, endereço, bairro, telefone, horário, atributos, coordenadas e distância até o hospital.</li>
+       <li>O usuário fecha o cartão ou seleciona outro estabelecimento.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário solicita a rota até o estabelecimento (<code>«extend» UC15</code>).</li>
+       <li><b>A2.</b> Atributo ausente no cadastro: o campo é exibido como <i>não informado</i>.</li>
+       <li><b>A3.</b> O usuário pressiona <kbd>Esc</kbd>: o cartão é fechado e a seleção, mantida.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Estabelecimento presente no conjunto-resposta e visível no mapa.</td></tr>
+     <tr><th>Pós-condições</th><td>Detalhes exibidos e estabelecimento marcado como selecionado em lista e mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC13</span><h3>Exportar resultados</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC08. Permite levar o resultado da consulta para fora do sistema em CSV, área de transferência ou impressão.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O usuário escolhe o formato: <b>CSV</b>, <b>copiar lista</b> ou <b>imprimir</b>.</li>
+       <li>O sistema monta o conteúdo com posição, nome, categoria, endereço, distância e coordenadas.</li>
+       <li>O sistema entrega o arquivo, copia o texto ou abre a caixa de impressão.</li>
+       <li>O sistema confirma a ação na barra de estado.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Lista vazia: a exportação é bloqueada e o sistema avisa que não há resultados.</li>
+       <li><b>E1.</b> Navegador nega acesso à área de transferência: o sistema exibe o texto para cópia manual.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Consulta executada com ao menos um resultado.</td></tr>
+     <tr><th>Pós-condições</th><td>Resultado entregue no formato escolhido; conjunto-resposta inalterado.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC14</span><h3>Alternar camadas do mapa</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC09. Controla a visibilidade das camadas temáticas — bairros (polígonos), vias principais e malha viária (linhas), áreas verdes (polígonos) e rótulos.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema lista as camadas disponíveis com o respectivo tipo de geometria e o estado atual.</li>
+       <li>O usuário liga ou desliga uma camada.</li>
+       <li>O sistema redesenha o mapa preservando o enquadramento, a seleção e o resultado da consulta.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Todas as camadas de fundo desligadas: permanecem visíveis o raio, o hospital e os resultados.</li>
+       <li><b>A2.</b> Rótulos desligados: os símbolos continuam sendo desenhados.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Mapa renderizado (UC09).</td></tr>
+     <tr><th>Pós-condições</th><td>Composição do mapa atualizada conforme a escolha do usuário.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC15</span><h3>Traçar rota até o estabelecimento</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC12. Desenha a linha de ligação entre o hospital e o estabelecimento escolhido e informa a distância e o tempo estimado de caminhada.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>No cartão de detalhe, o usuário aciona <i>Traçar rota</i>.</li>
+       <li>O sistema desenha a linha (geometria <code>LINESTRING</code>) do hospital ao estabelecimento.</li>
+       <li>O sistema exibe a distância em linha reta e o tempo estimado de caminhada a 5 km/h.</li>
+       <li>O sistema ajusta o enquadramento para conter os dois pontos.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário traça a rota para outro estabelecimento: a linha anterior é substituída.</li>
+       <li><b>A2.</b> O usuário limpa a rota, retornando à visualização anterior.</li>
+       <li><b>N1.</b> A rota é uma aproximação em linha reta; o protótipo não consulta serviço de roteamento por vias.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Estabelecimento selecionado com detalhes abertos (UC12).</td></tr>
+     <tr><th>Pós-condições</th><td>Linha de rota desenhada e medida apresentada ao usuário.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC16</span><h3>Manter cadastro de estabelecimentos</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Permite ao Administrador de Dados incluir, alterar e excluir estabelecimentos, garantindo que cada registro tenha categoria, atributos e coordenadas válidas.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O administrador se autentica e abre a manutenção do cadastro.</li>
+       <li>Escolhe incluir, alterar ou excluir um registro.</li>
+       <li>Informa nome, categoria, endereço, bairro, telefone, horário, atributos e coordenadas.</li>
+       <li>O sistema valida os campos obrigatórios e verifica se a coordenada está dentro da área de cobertura.</li>
+       <li>O sistema grava o registro e atualiza os contadores por categoria.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Coordenada fora da área de cobertura: o sistema recusa a gravação e destaca o campo.</li>
+       <li><b>A2.</b> Exclusão de registro em uso na consulta corrente: o sistema pede confirmação.</li>
+       <li><b>E1.</b> Falha na gravação: a operação é desfeita e o administrador é notificado.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Administrador autenticado com perfil de manutenção.</td></tr>
+     <tr><th>Pós-condições</th><td>Base de estabelecimentos atualizada e disponível para as próximas consultas.</td></tr>
+    </table>
+   </article>
+
+  </div>
+
+  <div class="note" style="margin-top:26px">
+    <b>Cobertura.</b> As 16 tabelas correspondem, uma a uma, aos 16 casos de uso do diagrama da Fig. 1.
+    Os casos UC02 e UC03 materializam as Estórias 1 e 2 do enunciado; UC07 concentra os operadores
+    <code>está contido</code>, <code>contém</code> e <code>intercepta</code>; UC08 e UC11 cobrem a
+    ordenação por aproximação e a alfabética.
+  </div>
+</div></div>
+</body>
+</html>
