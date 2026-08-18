@@ -1,0 +1,2514 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GeoSaúde BH</title>
+<meta name="description" content="Protótipo WebGIS para localização de serviços de saúde próximos a hospitais de Belo Horizonte.">
+<style>
+/* ==========================================================================
+   GeoSaúde BH — Sistema de design
+   Direção: instrumento cartográfico. Folha de planta + console clínico.
+   Semiologia: cada categoria tem UMA cor, repetida em marcador, legenda,
+   chip de lista e anel de busca. Nada de cor decorativa.
+   ========================================================================== */
+
+:root{
+  /* --- superfícies --- */
+  --paper:        #eaeeee;
+  --chrome:       #ffffff;
+  --chrome-2:     #f4f7f7;
+  --chrome-3:     #e9eeef;
+  --rule:         #d3dee1;
+  --rule-soft:    #e3ebec;
+
+  /* --- tinta --- */
+  --ink:          #0d1b24;
+  --ink-2:        #4d6773;
+  --ink-3:        #7d949e;
+
+  /* --- sinal (semiologia) --- */
+  --sig-hospital: #c2263f;
+  --sig-farmacia: #0b8a5f;
+  --sig-lab:      #5844c6;
+  --sig-ubs:      #b5701a;
+  --accent:       #06707c;
+  --accent-soft:  #d3ecee;
+
+  /* --- mapa --- */
+  --map-bg:       #e6ebe7;
+  --map-block:    #f2f5f1;
+  --map-minor:    #ffffff;
+  --map-minor-c:  #dae1da;
+  --map-major:    #ffffff;
+  --map-major-c:  #c3ccc2;
+  --map-park:     #cbdec4;
+  --map-park-l:   #4c7042;
+  --map-bairro:   #0d1b24;
+  --map-label:    #55666b;
+
+  --shadow-1: 0 1px 2px rgba(13,27,36,.06), 0 2px 8px rgba(13,27,36,.05);
+  --shadow-2: 0 2px 6px rgba(13,27,36,.09), 0 12px 32px rgba(13,27,36,.10);
+
+  --r-sm: 4px; --r-md: 7px; --r-lg: 12px;
+
+  --font-display: "Bahnschrift", "DIN Alternate", "Oswald", "Segoe UI Semibold",
+                  "Helvetica Neue", system-ui, sans-serif;
+  --font-body:    "Segoe UI Variable Text", "Segoe UI", Inter, -apple-system,
+                  BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:    "Cascadia Mono", "Consolas", "SF Mono", "JetBrains Mono",
+                  ui-monospace, monospace;
+
+  --header-h: 56px;
+  --footer-h: 30px;
+}
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#080d11; --chrome:#101a20; --chrome-2:#16232a; --chrome-3:#1d2c34;
+    --rule:#243740; --rule-soft:#1b2930;
+    --ink:#e4eef2; --ink-2:#9db2bc; --ink-3:#6c848f;
+    --sig-hospital:#f0687e; --sig-farmacia:#35c893; --sig-lab:#9c8bff; --sig-ubs:#dda253;
+    --accent:#2bb4bf; --accent-soft:#0d3c42;
+    --map-bg:#0b1216; --map-block:#111a1e; --map-minor:#2a3a41; --map-minor-c:#151f24;
+    --map-major:#3d5058; --map-major-c:#141e23; --map-park:#16301f; --map-park-l:#5f9a6d;
+    --map-bairro:#8fb7c4; --map-label:#84999f;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-2: 0 2px 6px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#080d11; --chrome:#101a20; --chrome-2:#16232a; --chrome-3:#1d2c34;
+  --rule:#243740; --rule-soft:#1b2930;
+  --ink:#e4eef2; --ink-2:#9db2bc; --ink-3:#6c848f;
+  --sig-hospital:#f0687e; --sig-farmacia:#35c893; --sig-lab:#9c8bff; --sig-ubs:#dda253;
+  --accent:#2bb4bf; --accent-soft:#0d3c42;
+  --map-bg:#0b1216; --map-block:#111a1e; --map-minor:#2a3a41; --map-minor-c:#151f24;
+  --map-major:#3d5058; --map-major-c:#141e23; --map-park:#16301f; --map-park-l:#5f9a6d;
+  --map-bairro:#8fb7c4; --map-label:#84999f;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 2px 6px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.45);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font-body); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+button,input,select,textarea{ font:inherit; color:inherit; }
+button{ cursor:pointer; background:none; border:none; }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
+
+/* ---------- micro-tipografia utilitária ---------- */
+.eyebrow{
+  font-family:var(--font-display); font-size:10px; font-weight:600;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3);
+}
+.num{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+
+/* ============================ ESQUELETO ============================ */
+.app{ height:100vh; display:grid; grid-template-rows:var(--header-h) 1fr var(--footer-h); }
+
+/* ---------- cabeçalho ---------- */
+.hdr{
+  display:flex; align-items:center; gap:18px; padding:0 14px;
+  background:var(--chrome); border-bottom:1px solid var(--rule);
+  z-index:40; position:relative;
+}
+.brand{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.brand svg{ display:block; }
+.brand b{
+  font-family:var(--font-display); font-size:17px; font-weight:600;
+  letter-spacing:.055em; text-transform:uppercase; line-height:1;
+}
+.brand span{ display:block; font-size:9.5px; letter-spacing:.13em; color:var(--ink-3);
+  text-transform:uppercase; font-family:var(--font-display); margin-top:2px; }
+
+.tabs{ display:flex; gap:2px; margin-left:6px; }
+.tab{
+  font-family:var(--font-display); font-size:11.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-2); padding:7px 12px;
+  border-radius:var(--r-sm); position:relative; white-space:nowrap;
+}
+.tab:hover{ background:var(--chrome-2); color:var(--ink); }
+.tab[aria-selected="true"]{ color:var(--ink); background:var(--chrome-3); }
+.tab[aria-selected="true"]::after{
+  content:""; position:absolute; left:12px; right:12px; bottom:-9px; height:2px;
+  background:var(--accent);
+}
+.hdr-spacer{ flex:1; }
+.hdr-tools{ display:flex; align-items:center; gap:6px; }
+.icon-btn{
+  width:32px; height:32px; display:grid; place-items:center; border-radius:var(--r-sm);
+  color:var(--ink-2); border:1px solid transparent;
+}
+.icon-btn:hover{ background:var(--chrome-2); color:var(--ink); border-color:var(--rule); }
+
+/* ---------- rodapé / barra de estado ---------- */
+.foot{
+  display:flex; align-items:center; gap:0; padding:0 12px;
+  background:var(--chrome); border-top:1px solid var(--rule);
+  font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3);
+  letter-spacing:.02em; overflow:hidden;
+}
+.foot > *{ padding:0 12px; border-right:1px solid var(--rule-soft); white-space:nowrap; }
+.foot > *:first-child{ padding-left:0; }
+.foot > *:last-child{ border-right:none; }
+.foot .grow{ flex:1; border:none; text-align:right; color:var(--ink-2); }
+.foot b{ color:var(--ink-2); font-weight:600; }
+
+/* ---------- corpo ---------- */
+.body{ position:relative; min-height:0; }
+.view{ position:absolute; inset:0; }
+.view[hidden]{ display:none; }
+
+/* ============================ VISTA: MAPA ============================ */
+#view-map:not([hidden]){ display:grid; grid-template-columns:308px minmax(0,1fr) 372px; }
+.panel{
+  background:var(--chrome); display:flex; flex-direction:column; min-height:0;
+  min-width:0;
+}
+.panel--left{ border-right:1px solid var(--rule); }
+.panel--right{ border-left:1px solid var(--rule); }
+.panel-scroll{ overflow-y:auto; overflow-x:hidden; flex:1; min-height:0; scrollbar-width:thin; }
+.panel-scroll::-webkit-scrollbar{ width:9px; }
+.panel-scroll::-webkit-scrollbar-thumb{ background:var(--rule); border-radius:9px;
+  border:3px solid var(--chrome); }
+
+section.block{ border-bottom:1px solid var(--rule-soft); padding:14px 16px 16px; }
+section.block:last-child{ border-bottom:none; }
+.block-hd{ display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; }
+.block-hd h2{ margin:0; font-family:var(--font-display); font-size:11px; font-weight:600;
+  letter-spacing:.15em; text-transform:uppercase; color:var(--ink-2); }
+
+/* selo de tipo de geometria — informação real, não enfeite */
+.geom{
+  font-family:var(--font-mono); font-size:9px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--ink-3); border:1px solid var(--rule); border-radius:2px; padding:1px 5px;
+  display:inline-flex; align-items:center; gap:4px; line-height:1.5;
+}
+.geom i{ font-style:normal; font-size:10px; }
+
+/* ---------- controles ---------- */
+label.fld{ display:block; margin-bottom:12px; }
+label.fld:last-child{ margin-bottom:0; }
+label.fld > span{ display:block; margin-bottom:5px; font-size:11px; color:var(--ink-2);
+  font-weight:600; letter-spacing:.02em; }
+select,input[type="text"],input[type="number"]{
+  width:100%; padding:8px 10px; background:var(--chrome-2); color:var(--ink);
+  border:1px solid var(--rule); border-radius:var(--r-md); font-size:13px;
+  appearance:none;
+}
+select{
+  background-image:linear-gradient(45deg,transparent 50%,var(--ink-3) 50%),
+                   linear-gradient(135deg,var(--ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 15px, calc(100% - 10px) 15px;
+  background-size:5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:30px;
+}
+select:hover,input:hover{ border-color:var(--ink-3); }
+select:focus,input:focus{ outline:none; border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft); }
+
+.chips{ display:flex; flex-wrap:wrap; gap:5px; }
+.chip{
+  font-family:var(--font-mono); font-size:11px; padding:5px 9px; border-radius:var(--r-sm);
+  border:1px solid var(--rule); background:var(--chrome-2); color:var(--ink-2);
+  transition:background .12s, color .12s, border-color .12s;
+}
+.chip:hover{ border-color:var(--ink-3); color:var(--ink); }
+.chip[aria-pressed="true"]{
+  background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;
+}
+:root[data-theme="dark"] .chip[aria-pressed="true"],
+:root:not([data-theme="light"]) .chip[aria-pressed="true"]{ color:#04191c; }
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]) .chip[aria-pressed="true"]{ color:#fff; }
+}
+
+input[type="range"]{ width:100%; accent-color:var(--accent); margin:6px 0 0; }
+
+/* ---------- categorias (com semiologia) ---------- */
+.cat{
+  display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:var(--r-md);
+  cursor:pointer; user-select:none; border:1px solid transparent;
+}
+.cat:hover{ background:var(--chrome-2); }
+.cat input{ appearance:none; width:15px; height:15px; border:1.5px solid var(--rule);
+  border-radius:3px; display:grid; place-items:center; flex-shrink:0; cursor:pointer;
+  background:var(--chrome); }
+.cat input:checked{ background:var(--c); border-color:var(--c); }
+.cat input:checked::after{ content:""; width:7px; height:4px; border:2px solid #fff;
+  border-top:0; border-right:0; transform:rotate(-45deg) translate(0,-1px); }
+.cat .sw{ width:11px; height:11px; border-radius:50%; background:var(--c); flex-shrink:0;
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--c) 22%, transparent); }
+.cat .nm{ flex:1; font-size:13px; }
+.cat .ct{ font-family:var(--font-mono); font-size:11px; color:var(--ink-3); }
+
+/* ---------- console de consulta espacial (ELEMENTO-ASSINATURA) ---------- */
+.console{
+  background:var(--chrome-3); border:1px solid var(--rule); border-radius:var(--r-md);
+  padding:10px 11px; font-family:var(--font-mono); font-size:11px; line-height:1.75;
+  color:var(--ink-2); overflow-x:auto; position:relative;
+}
+.console .kw{ color:var(--accent); font-weight:600; }
+.console .fn{ color:var(--sig-lab); font-weight:600; }
+.console .st{ color:var(--sig-farmacia); }
+.console .nm2{ color:var(--ink); font-weight:600; }
+.console .cm{ color:var(--ink-3); font-style:italic; }
+
+.pred{ display:flex; flex-direction:column; gap:1px; margin-top:10px; }
+.pred-row{
+  display:grid; grid-template-columns:auto 1fr auto; gap:9px; align-items:center;
+  padding:7px 2px; border-top:1px solid var(--rule-soft); font-size:12px;
+}
+.pred-row:first-child{ border-top:none; }
+.pred-op{ font-family:var(--font-mono); font-size:10px; color:var(--accent);
+  background:var(--accent-soft); padding:2px 5px; border-radius:2px; letter-spacing:.02em; }
+.pred-txt{ color:var(--ink-2); min-width:0; }
+.pred-txt b{ color:var(--ink); font-weight:600; }
+.pred-val{ font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--ink); }
+
+/* ---------- botão principal ---------- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  padding:9px 14px; border-radius:var(--r-md); font-family:var(--font-display);
+  font-size:12px; letter-spacing:.1em; text-transform:uppercase; font-weight:600;
+  border:1px solid var(--rule); background:var(--chrome-2); color:var(--ink);
+  transition:background .12s, border-color .12s, transform .06s;
+}
+.btn:hover{ background:var(--chrome-3); border-color:var(--ink-3); }
+.btn:active{ transform:translateY(1px); }
+.btn--go{ background:var(--accent); border-color:var(--accent); color:#fff; width:100%; }
+.btn--go:hover{ filter:brightness(1.08); background:var(--accent); border-color:var(--accent); }
+:root[data-theme="dark"] .btn--go{ color:#04191c; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .btn--go{ color:#04191c; } }
+.btn--sm{ padding:6px 10px; font-size:11px; letter-spacing:.07em; }
+
+/* ============================ MAPA ============================ */
+.stage{ position:relative; background:var(--map-bg); overflow:hidden; min-width:0; }
+#map{ position:absolute; inset:0; width:100%; height:100%; display:block;
+  cursor:grab; touch-action:none; }
+#map.dragging{ cursor:grabbing; }
+#map text{ pointer-events:none; user-select:none; }
+
+.map-block{ fill:var(--map-block); }
+.mn{ stroke:var(--map-minor); }
+.mn-c{ stroke:var(--map-minor-c); }
+.mj{ stroke:var(--map-major); }
+.mj-c{ stroke:var(--map-major-c); }
+.park{ fill:var(--map-park); stroke:var(--map-park-l); stroke-opacity:.4; }
+.park-l{ fill:var(--map-park-l); font-size:9px; font-style:italic;
+  font-family:var(--font-body); }
+.bairro{ fill:var(--map-bairro); fill-opacity:.045; stroke:var(--map-bairro);
+  stroke-opacity:.26; stroke-width:1; stroke-dasharray:5 4; }
+.bairro.hit{ fill-opacity:.10; stroke-opacity:.55; stroke-dasharray:none; }
+.bairro-l{ fill:var(--map-bairro); fill-opacity:.62; font-family:var(--font-display);
+  font-size:10px; letter-spacing:.19em; text-transform:uppercase; text-anchor:middle; }
+.street-l{ fill:var(--map-label); font-size:9.5px; font-family:var(--font-body);
+  font-weight:600; letter-spacing:.02em; }
+
+.buffer{ fill:var(--accent); fill-opacity:.075; stroke:var(--accent); stroke-width:1.6;
+  stroke-dasharray:7 5; }
+.buffer-run{ animation:sweep .75s ease-out; }
+@keyframes sweep{ from{ stroke-dashoffset:900; opacity:.15 } to{ stroke-dashoffset:0; opacity:1 } }
+.radius-tick{ stroke:var(--accent); stroke-width:1.3; stroke-dasharray:3 3; }
+.radius-l{ fill:var(--accent); font-family:var(--font-mono); font-size:10px; font-weight:700; }
+.radius-l-bg{ fill:var(--map-bg); }
+
+.route{ stroke:var(--ink); stroke-width:2.2; stroke-dasharray:8 5; fill:none;
+  stroke-linecap:round; opacity:.85; animation:march 1.4s linear infinite; }
+@keyframes march{ to{ stroke-dashoffset:-26 } }
+
+.mk{ cursor:pointer; }
+.mk-halo{ fill:var(--c); opacity:0; transition:opacity .15s; }
+.mk.on .mk-halo, .mk:hover .mk-halo{ opacity:.22; }
+.mk-dot{ fill:var(--c); stroke:var(--chrome); stroke-width:1.8; }
+.mk.on .mk-dot{ stroke-width:2.6; }
+.mk-rank{ fill:#fff; font-family:var(--font-mono); font-size:8.5px; font-weight:700;
+  text-anchor:middle; }
+.mk-l{ fill:var(--ink); font-size:10px; font-weight:600; paint-order:stroke;
+  stroke:var(--map-bg); stroke-width:3.2; stroke-linejoin:round; }
+.hosp-pin{ fill:var(--sig-hospital); stroke:var(--chrome); stroke-width:2; }
+.hosp-cross{ stroke:#fff; stroke-width:2.2; stroke-linecap:round; }
+.dim{ opacity:.28; }
+
+@media (prefers-reduced-motion: reduce){
+  .buffer-run{ animation:none } .route{ animation:none } *{ scroll-behavior:auto }
+}
+
+/* ---------- sobreposições do mapa ---------- */
+.ov{ position:absolute; z-index:10; }
+.ov-tl{ top:12px; left:12px; }
+.ov-tr{ top:12px; right:12px; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+.ov-bl{ bottom:12px; left:12px; }
+.ov-br{ bottom:12px; right:12px; }
+
+.zoomer{ background:var(--chrome); border:1px solid var(--rule); border-radius:var(--r-md);
+  box-shadow:var(--shadow-1); overflow:hidden; display:flex; flex-direction:column; }
+.zoomer button{ width:32px; height:31px; display:grid; place-items:center; color:var(--ink-2);
+  font-size:15px; font-family:var(--font-mono); }
+.zoomer button:hover{ background:var(--chrome-2); color:var(--ink); }
+.zoomer button + button{ border-top:1px solid var(--rule-soft); }
+
+.legend{
+  background:color-mix(in srgb, var(--chrome) 93%, transparent);
+  backdrop-filter:blur(8px); border:1px solid var(--rule); border-radius:var(--r-md);
+  box-shadow:var(--shadow-1); padding:9px 11px; max-width:230px;
+}
+.legend h3{ margin:0 0 7px; font-family:var(--font-display); font-size:9.5px;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); font-weight:600; }
+.legend ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
+.legend li{ display:flex; align-items:center; gap:7px; font-size:11px; color:var(--ink-2); }
+.legend .k{ width:15px; display:grid; place-items:center; flex-shrink:0; }
+
+.scalebar{ display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  font-family:var(--font-mono); font-size:10px; color:var(--ink-2);
+  background:color-mix(in srgb, var(--chrome) 88%, transparent); padding:4px 7px;
+  border-radius:var(--r-sm); border:1px solid var(--rule); }
+.scalebar .bar{ height:5px; border:1.4px solid var(--ink-2); border-top:none; }
+
+.toast{
+  position:absolute; left:50%; bottom:22px; transform:translateX(-50%);
+  background:var(--ink); color:var(--paper); padding:9px 15px; border-radius:var(--r-md);
+  font-size:12.5px; box-shadow:var(--shadow-2); z-index:30; max-width:80%;
+  opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+}
+.toast.on{ opacity:1; transform:translateX(-50%) translateY(-4px); }
+
+/* ---------- cartão de detalhe (popup) ---------- */
+.popup{
+  position:absolute; z-index:25; width:262px; background:var(--chrome);
+  border:1px solid var(--rule); border-radius:var(--r-lg); box-shadow:var(--shadow-2);
+  overflow:hidden;
+}
+.popup[hidden]{ display:none; }
+.popup-hd{ padding:11px 13px 9px; border-bottom:1px solid var(--rule-soft);
+  border-top:3px solid var(--c); }
+.popup-hd h4{ margin:0 0 3px; font-size:14px; font-weight:650; line-height:1.28; }
+.popup-hd .sub{ font-size:11px; color:var(--ink-3); }
+.popup-bd{ padding:10px 13px; display:flex; flex-direction:column; gap:7px; font-size:12px; }
+.popup-row{ display:grid; grid-template-columns:74px 1fr; gap:8px; color:var(--ink-2); }
+.popup-row b{ color:var(--ink-3); font-weight:600; font-size:10.5px; letter-spacing:.05em;
+  text-transform:uppercase; padding-top:1px; font-family:var(--font-display); }
+.popup-ft{ display:flex; gap:6px; padding:0 13px 12px; }
+.popup-close{ position:absolute; top:8px; right:8px; width:22px; height:22px;
+  display:grid; place-items:center; border-radius:4px; color:var(--ink-3); font-size:15px;
+  line-height:1; }
+.popup-close:hover{ background:var(--chrome-2); color:var(--ink); }
+
+/* ============================ RESULTADOS ============================ */
+.res-hd{ padding:13px 16px 11px; border-bottom:1px solid var(--rule); }
+.res-count{ display:flex; align-items:baseline; gap:8px; margin-bottom:11px; }
+.res-count strong{ font-family:var(--font-display); font-size:27px; font-weight:600;
+  line-height:1; letter-spacing:-.01em; }
+.res-count span{ font-size:11.5px; color:var(--ink-2); line-height:1.3; }
+.sorters{ display:flex; gap:3px; background:var(--chrome-2); padding:3px;
+  border-radius:var(--r-md); border:1px solid var(--rule); }
+.sorters button{ flex:1; padding:5px 4px; border-radius:var(--r-sm); font-size:11px;
+  color:var(--ink-2); font-weight:600; white-space:nowrap; }
+.sorters button:hover{ color:var(--ink); }
+.sorters button[aria-pressed="true"]{ background:var(--chrome); color:var(--ink);
+  box-shadow:var(--shadow-1); }
+
+.res-list{ list-style:none; margin:0; padding:0; }
+.res-item{
+  display:grid; grid-template-columns:30px 1fr auto; gap:11px; align-items:start;
+  padding:11px 16px; border-bottom:1px solid var(--rule-soft); cursor:pointer;
+  border-left:3px solid transparent; transition:background .1s;
+}
+.res-item:hover{ background:var(--chrome-2); }
+.res-item.on{ background:var(--chrome-2); border-left-color:var(--c); }
+.res-rank{
+  width:24px; height:24px; border-radius:50%; background:var(--c); color:#fff;
+  display:grid; place-items:center; font-family:var(--font-mono); font-size:10.5px;
+  font-weight:700; margin-top:1px;
+}
+.res-main{ min-width:0; }
+.res-name{ font-size:13.5px; font-weight:600; line-height:1.3; margin-bottom:2px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.res-addr{ font-size:11.5px; color:var(--ink-3); overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.res-tags{ display:flex; gap:4px; margin-top:5px; flex-wrap:wrap; }
+.tag{ font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; font-weight:600;
+  padding:2px 5px; border-radius:2px; background:var(--chrome-3); color:var(--ink-2);
+  font-family:var(--font-display); }
+.tag--hi{ background:color-mix(in srgb, var(--c) 15%, transparent); color:var(--c); }
+.res-dist{ text-align:right; padding-top:2px; }
+.res-dist .d{ font-family:var(--font-mono); font-size:14px; font-weight:700;
+  font-variant-numeric:tabular-nums; line-height:1.1; }
+.res-dist .u{ font-family:var(--font-mono); font-size:9.5px; color:var(--ink-3);
+  font-weight:600; margin-left:2px; }
+.res-dist .w{ font-size:10px; color:var(--ink-3); margin-top:3px; white-space:nowrap; }
+
+.empty{ padding:44px 26px; text-align:center; color:var(--ink-3); }
+.empty svg{ margin-bottom:12px; opacity:.5; }
+.empty p{ margin:0 0 4px; font-size:13px; color:var(--ink-2); font-weight:600; }
+.empty small{ font-size:11.5px; line-height:1.5; display:block; }
+
+/* ============================ VISTAS DE DOCUMENTAÇÃO ============================ */
+.doc{ height:100%; overflow-y:auto; background:var(--paper); }
+.doc-inner{ max-width:1180px; margin:0 auto; padding:38px 30px 90px; }
+.doc h1{ font-family:var(--font-display); font-size:30px; font-weight:600; margin:0 0 6px;
+  letter-spacing:-.005em; }
+.doc .lede{ color:var(--ink-2); font-size:14.5px; max-width:70ch; margin:0 0 30px; }
+.doc h2{ font-family:var(--font-display); font-size:14px; letter-spacing:.13em;
+  text-transform:uppercase; color:var(--ink-2); margin:38px 0 14px; padding-bottom:8px;
+  border-bottom:1px solid var(--rule); font-weight:600; }
+.doc h3{ font-size:15px; margin:26px 0 8px; font-weight:650; }
+.doc p{ max-width:76ch; }
+.doc-figure{ background:var(--chrome); border:1px solid var(--rule); border-radius:var(--r-lg);
+  padding:16px; overflow-x:auto; box-shadow:var(--shadow-1); }
+.doc-figure svg{ display:block; margin:0 auto; min-width:940px; }
+figcaption{ font-size:11.5px; color:var(--ink-3); margin-top:11px; text-align:center;
+  font-family:var(--font-mono); }
+
+.uc-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); }
+.uc{ background:var(--chrome); border:1px solid var(--rule); border-radius:var(--r-lg);
+  overflow:hidden; box-shadow:var(--shadow-1); }
+.uc-hd{ padding:12px 15px; border-bottom:1px solid var(--rule); display:flex;
+  align-items:center; gap:10px; background:var(--chrome-2); }
+.uc-id{ font-family:var(--font-mono); font-size:11px; font-weight:700; color:#fff;
+  background:var(--accent); padding:3px 7px; border-radius:3px; flex-shrink:0; }
+:root[data-theme="dark"] .uc-id{ color:#04191c; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .uc-id{ color:#04191c; } }
+.uc-hd h3{ margin:0; font-size:14px; font-weight:650; }
+.uc table{ width:100%; border-collapse:collapse; }
+.uc th,.uc td{ text-align:left; vertical-align:top; padding:9px 15px;
+  border-bottom:1px solid var(--rule-soft); font-size:12.5px; }
+.uc tr:last-child th,.uc tr:last-child td{ border-bottom:none; }
+.uc th{ width:120px; font-family:var(--font-display); font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:600; padding-top:11px; }
+.uc td{ color:var(--ink-2); }
+.uc ol,.uc ul{ margin:0; padding-left:17px; }
+.uc li{ margin-bottom:3px; }
+.uc code{ font-family:var(--font-mono); font-size:11px; background:var(--chrome-3);
+  padding:1px 4px; border-radius:2px; color:var(--ink); }
+
+.rel-tbl{ width:100%; border-collapse:collapse; background:var(--chrome);
+  border:1px solid var(--rule); border-radius:var(--r-lg); overflow:hidden;
+  box-shadow:var(--shadow-1); }
+.rel-tbl th,.rel-tbl td{ text-align:left; padding:9px 14px;
+  border-bottom:1px solid var(--rule-soft); font-size:12.5px; }
+.rel-tbl thead th{ background:var(--chrome-2); font-family:var(--font-display);
+  font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); }
+.rel-tbl tr:last-child td{ border-bottom:none; }
+.rel-tbl code{ font-family:var(--font-mono); font-size:11px; }
+
+.note{ background:var(--chrome); border:1px solid var(--rule);
+  border-left:3px solid var(--accent); border-radius:var(--r-md); padding:12px 15px;
+  font-size:12.5px; color:var(--ink-2); margin:18px 0; max-width:76ch; }
+.note b{ color:var(--ink); }
+
+/* ---------- notação do diagrama ---------- */
+.d-boundary{ fill:none; stroke:var(--ink-3); stroke-width:1.3; }
+.d-boundary-bg{ fill:var(--chrome-2); }
+.d-title{ fill:var(--ink); font-family:var(--font-display); font-size:13px;
+  letter-spacing:.11em; text-transform:uppercase; text-anchor:middle; font-weight:600; }
+.d-uc{ fill:var(--chrome); stroke:var(--ink-2); stroke-width:1.2; }
+.d-uc--core{ fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.7; }
+.d-uc--abs{ stroke-dasharray:none; }
+.d-t{ fill:var(--ink); font-family:var(--font-body); font-size:11px; text-anchor:middle; }
+.d-t--sm{ font-size:10px; }
+.d-t--it{ font-style:italic; fill:var(--ink-2); font-size:9.5px; }
+.d-actor{ fill:none; stroke:var(--ink); stroke-width:1.5; stroke-linecap:round; }
+.d-actor-t{ fill:var(--ink); font-family:var(--font-body); font-size:11px; font-weight:600;
+  text-anchor:middle; }
+.d-assoc{ stroke:var(--ink-2); stroke-width:1.2; fill:none; }
+.d-dash{ stroke:var(--ink-2); stroke-width:1.2; stroke-dasharray:6 4; fill:none; }
+.d-gen{ stroke:var(--ink-2); stroke-width:1.2; fill:none; }
+.d-stereo{ fill:var(--ink-2); font-family:var(--font-mono); font-size:9px; text-anchor:middle; }
+.d-legend{ fill:var(--chrome); stroke:var(--rule); stroke-width:1; }
+
+/* ============================ RESPONSIVO ============================ */
+@media (max-width:1240px){
+  #view-map{ grid-template-columns:272px minmax(0,1fr) 320px; }
+}
+@media (max-width:1000px){
+  body{ overflow:auto; }
+  .app{ height:auto; min-height:100vh; grid-template-rows:auto 1fr auto; }
+  .hdr{ flex-wrap:wrap; height:auto; padding:9px 12px; gap:10px; }
+  .tabs{ order:3; width:100%; overflow-x:auto; }
+  .body{ position:static; }
+  .view{ position:static; }
+  #view-map:not([hidden]){ display:block; }
+  .panel{ border:none; border-bottom:1px solid var(--rule); }
+  .panel--right{ border-left:none; }
+  .panel-scroll{ overflow:visible; }
+  .stage{ height:62vh; min-height:400px; position:relative; }
+  .doc{ height:auto; overflow:visible; }
+  .doc-inner{ padding:26px 18px 70px; }
+  .uc-grid{ grid-template-columns:1fr; }
+  .foot{ display:none; }
+}
+@media (max-width:560px){
+  .doc h1{ font-size:23px; }
+  .uc th{ width:96px; font-size:9px; }
+  .uc th,.uc td{ padding:8px 11px; font-size:12px; }
+  .res-item{ padding:10px 12px; }
+  .legend{ display:none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ============================ CABEÇALHO ============================ -->
+<header class="hdr">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+      <path d="M13 1.6 C8.6 1.6 5 5.1 5 9.4 c0 5.9 8 15 8 15 s8-9.1 8-15 C21 5.1 17.4 1.6 13 1.6Z"
+            fill="var(--accent)"/>
+      <path d="M13 6.4v6.6M9.7 9.7h6.6" stroke="var(--chrome)" stroke-width="2.1"
+            stroke-linecap="round"/>
+    </svg>
+    <div>
+      <b>GeoSaúde&nbsp;BH</b>
+      <span>WebGIS · Serviços de saúde</span>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Seções do sistema">
+    <button class="tab" role="tab" id="tab-map"  aria-selected="true"  aria-controls="view-map">Mapa</button>
+    <button class="tab" role="tab" id="tab-uc"   aria-selected="false" aria-controls="view-uc">Casos de uso</button>
+    <button class="tab" role="tab" id="tab-spec" aria-selected="false" aria-controls="view-spec">Especificações</button>
+  </nav>
+
+  <div class="hdr-spacer"></div>
+
+  <div class="hdr-tools">
+    <button class="icon-btn" id="btn-theme" title="Alternar tema claro/escuro" aria-label="Alternar tema">
+      <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- ============================ CORPO ============================ -->
+<div class="body">
+
+<!-- ─────────────────────────── VISTA 1 · MAPA ─────────────────────────── -->
+<div class="view" id="view-map" role="tabpanel" aria-labelledby="tab-map">
+
+  <!-- ---------- painel de consulta ---------- -->
+  <aside class="panel panel--left">
+    <div class="panel-scroll">
+
+      <section class="block">
+        <div class="block-hd">
+          <h2>Ponto de referência</h2>
+          <span class="geom"><i>▲</i>ponto</span>
+        </div>
+        <label class="fld">
+          <span>Hospital</span>
+          <select id="sel-hospital"></select>
+        </label>
+        <div class="console" id="ref-readout" aria-live="polite"></div>
+      </section>
+
+      <section class="block">
+        <div class="block-hd">
+          <h2>Raio de busca</h2>
+          <span class="geom"><i>▮</i>polígono</span>
+        </div>
+        <div class="chips" id="radius-chips" role="group" aria-label="Raios pré-definidos">
+          <button class="chip" data-r="200">200 m</button>
+          <button class="chip" data-r="500">500 m</button>
+          <button class="chip" data-r="1000">1 km</button>
+          <button class="chip" data-r="2000">2 km</button>
+        </div>
+        <input type="range" id="radius-range" min="100" max="3000" step="50" value="500"
+               aria-label="Raio de busca em metros">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
+          <span class="eyebrow">100 m</span>
+          <span class="num" id="radius-out" style="font-size:13px;font-weight:700">500 m</span>
+          <span class="eyebrow">3 km</span>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="block-hd">
+          <h2>Categorias</h2>
+          <span class="geom"><i>▲</i>ponto</span>
+        </div>
+        <div id="cat-list"></div>
+      </section>
+
+      <section class="block" id="block-sub">
+        <div class="block-hd"><h2>Filtros de atributo</h2></div>
+        <div id="sub-filters" class="chips"></div>
+      </section>
+
+      <section class="block">
+        <div class="block-hd">
+          <h2>Camadas do mapa</h2>
+          <span class="geom"><i>▬</i>linha</span>
+        </div>
+        <div class="chips" id="layer-chips" role="group" aria-label="Camadas">
+          <button class="chip" data-layer="bairros" aria-pressed="true">Bairros</button>
+          <button class="chip" data-layer="vias" aria-pressed="true">Vias principais</button>
+          <button class="chip" data-layer="quadras" aria-pressed="true">Malha viária</button>
+          <button class="chip" data-layer="parques" aria-pressed="true">Áreas verdes</button>
+          <button class="chip" data-layer="rotulos" aria-pressed="true">Rótulos</button>
+        </div>
+      </section>
+
+      <section class="block">
+        <button class="btn btn--go" id="btn-search">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+               stroke-width="1.9" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.6"/><path d="M10.4 10.4 14 14" stroke-linecap="round"/>
+          </svg>
+          Executar consulta
+        </button>
+      </section>
+
+    </div>
+  </aside>
+
+  <!-- ---------- mapa ---------- -->
+  <main class="stage" id="stage">
+    <svg id="map" role="img" aria-label="Mapa da região central de Belo Horizonte"></svg>
+
+    <div class="ov ov-tr">
+      <div class="zoomer">
+        <button id="zin"  aria-label="Aproximar">+</button>
+        <button id="zout" aria-label="Afastar">−</button>
+        <button id="zfit" aria-label="Enquadrar resultados" title="Enquadrar resultado"
+                style="font-size:12px">⤢</button>
+      </div>
+    </div>
+
+    <div class="ov ov-bl">
+      <div class="legend">
+        <h3>Legenda</h3>
+        <ul id="legend-list"></ul>
+      </div>
+    </div>
+
+    <div class="ov ov-br">
+      <div class="scalebar">
+        <span id="scale-txt">—</span>
+        <div class="bar" id="scale-bar" style="width:80px"></div>
+      </div>
+    </div>
+
+    <div class="popup" id="popup" hidden></div>
+    <div class="toast" id="toast" role="status"></div>
+  </main>
+
+  <!-- ---------- resultados ---------- -->
+  <aside class="panel panel--right">
+    <div class="res-hd">
+      <div class="res-count">
+        <strong class="num" id="res-n">0</strong>
+        <span id="res-label">estabelecimentos<br>no raio definido</span>
+      </div>
+      <div class="sorters" role="group" aria-label="Ordenação dos resultados">
+        <button data-sort="dist" aria-pressed="true">Proximidade</button>
+        <button data-sort="az"   aria-pressed="false">A → Z</button>
+        <button data-sort="za"   aria-pressed="false">Z → A</button>
+      </div>
+    </div>
+
+    <div class="panel-scroll">
+      <ul class="res-list" id="res-list"></ul>
+
+      <section class="block" id="block-spatial">
+        <div class="block-hd">
+          <h2>Consulta espacial</h2>
+          <span class="geom"><i>◇</i>topologia</span>
+        </div>
+        <div class="console" id="sql-readout" aria-live="polite"></div>
+        <div class="pred" id="pred-list"></div>
+      </section>
+
+      <section class="block">
+        <div class="block-hd"><h2>Exportar</h2></div>
+        <div class="chips">
+          <button class="chip" id="exp-csv">Baixar CSV</button>
+          <button class="chip" id="exp-clip">Copiar lista</button>
+          <button class="chip" id="exp-print">Imprimir</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+</div>
+
+<!-- ─────────────────────── VISTA 2 · CASOS DE USO ─────────────────────── -->
+<div class="view doc" id="view-uc" role="tabpanel" aria-labelledby="tab-uc" hidden>
+ <div class="doc-inner">
+  <span class="eyebrow">Entregável 1</span>
+  <h1>Diagrama de Casos de Uso</h1>
+  <p class="lede">Modelo UML do sistema <b>GeoSaúde BH</b>. A fronteira delimita o sistema WebGIS;
+     os atores externos ficam fora dela. Os três elipsóides em destaque correspondem às estórias
+     do usuário do enunciado — as demais são os passos que elas incluem ou estendem.</p>
+
+  <figure class="doc-figure">
+   <svg viewBox="0 0 1400 1200" width="100%" role="img"
+        aria-label="Diagrama UML de casos de uso do sistema GeoSaúde BH">
+    <defs>
+      <marker id="open" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+        <path d="M1,1 L9,5 L1,9" fill="none" stroke="var(--ink-2)" stroke-width="1.3"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+      <marker id="tri" markerWidth="13" markerHeight="13" refX="12" refY="6.5" orient="auto">
+        <path d="M1,1 L12,6.5 L1,12 z" fill="var(--chrome)" stroke="var(--ink-2)"
+              stroke-width="1.3" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+
+    <!-- ===== fronteira do sistema ===== -->
+    <rect x="300" y="60" width="880" height="1020" rx="6" class="d-boundary-bg"/>
+    <rect x="300" y="60" width="880" height="1020" rx="6" class="d-boundary"/>
+    <text x="740" y="94" class="d-title">Sistema WebGIS GeoSaúde BH</text>
+    <line x1="300" y1="112" x2="1180" y2="112" stroke="var(--rule)" stroke-width="1"/>
+
+    <!-- ===== atores ===== -->
+    <!-- Familiar do Paciente -->
+    <g class="d-actor">
+      <circle cx="110" cy="145" r="9" fill="var(--chrome)"/>
+      <path d="M110 154v23M96 165h28M110 177l-11 18M110 177l11 18"/>
+    </g>
+    <text class="d-actor-t" x="110" y="112">Familiar do</text>
+    <text class="d-actor-t" x="110" y="126">Paciente</text>
+
+    <!-- Usuário do Sistema (abstrato) -->
+    <g class="d-actor">
+      <circle cx="110" cy="385" r="9" fill="var(--chrome)"/>
+      <path d="M110 394v23M96 405h28M110 417l-11 18M110 417l11 18"/>
+    </g>
+    <text class="d-stereo" x="134" y="452" text-anchor="start">«abstract»</text>
+    <text class="d-actor-t" x="134" y="468" text-anchor="start">Usuário do Sistema</text>
+
+    <!-- Médico -->
+    <g class="d-actor">
+      <circle cx="110" cy="665" r="9" fill="var(--chrome)"/>
+      <path d="M110 674v23M96 685h28M110 697l-11 18M110 697l11 18"/>
+    </g>
+    <text class="d-actor-t" x="110" y="746">Médico</text>
+
+    <!-- Administrador de Dados -->
+    <g class="d-actor">
+      <circle cx="1290" cy="965" r="9" fill="var(--chrome)"/>
+      <path d="M1290 974v23M1276 985h28M1290 997l-11 18M1290 997l11 18"/>
+    </g>
+    <text class="d-actor-t" x="1290" y="1046">Administrador</text>
+    <text class="d-actor-t" x="1290" y="1060">de Dados</text>
+
+    <!-- Provedor de Geodados (ator secundário / sistema externo) -->
+    <g class="d-actor">
+      <circle cx="700" cy="1105" r="9" fill="var(--chrome)"/>
+      <path d="M700 1114v23M686 1125h28M700 1137l-11 18M700 1137l11 18"/>
+    </g>
+    <text class="d-stereo" x="700" y="1094">«system»</text>
+    <text class="d-actor-t" x="700" y="1186">Provedor de Geodados</text>
+
+    <!-- ===== generalização de atores ===== -->
+    <line class="d-gen" x1="110" y1="208" x2="110" y2="360" marker-end="url(#tri)"/>
+    <line class="d-gen" x1="110" y1="640" x2="110" y2="452" marker-end="url(#tri)"/>
+
+    <!-- ===== casos de uso · coluna A (núcleo) ===== -->
+    <ellipse cx="430" cy="160" rx="105" ry="36" class="d-uc d-uc--core"/>
+    <text class="d-stereo" x="430" y="141">UC02</text>
+    <text class="d-t" x="430" y="161">Localizar farmácias</text>
+    <text class="d-t" x="430" y="176">próximas</text>
+
+    <ellipse cx="430" cy="400" rx="105" ry="36" class="d-uc d-uc--core"/>
+    <text class="d-stereo" x="430" y="378">UC01</text>
+    <text class="d-t" x="430" y="396">Localizar serviços de</text>
+    <text class="d-t" x="430" y="411">saúde próximos</text>
+    <text class="d-t d-t--it" x="430" y="425">{abstract}</text>
+
+    <ellipse cx="430" cy="660" rx="105" ry="36" class="d-uc d-uc--core"/>
+    <text class="d-stereo" x="430" y="639">UC03</text>
+    <text class="d-t d-t--sm" x="430" y="658">Localizar laboratórios de</text>
+    <text class="d-t d-t--sm" x="430" y="673">radiografia próximos</text>
+
+    <!-- generalização de casos de uso -->
+    <line class="d-gen" x1="430" y1="196" x2="430" y2="352" marker-end="url(#tri)"/>
+    <line class="d-gen" x1="430" y1="624" x2="430" y2="448" marker-end="url(#tri)"/>
+
+    <!-- ===== casos de uso · coluna B (incluídos) ===== -->
+    <ellipse cx="700" cy="150" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="700" y="131">UC04</text>
+    <text class="d-t" x="700" y="151">Selecionar hospital</text>
+    <text class="d-t" x="700" y="166">de referência</text>
+
+    <ellipse cx="700" cy="254" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="700" y="248">UC05</text>
+    <text class="d-t" x="700" y="266">Definir raio de busca</text>
+
+    <ellipse cx="700" cy="358" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="700" y="339">UC06</text>
+    <text class="d-t" x="700" y="359">Filtrar por categoria</text>
+    <text class="d-t" x="700" y="374">e atributos</text>
+
+    <ellipse cx="700" cy="462" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="700" y="443">UC07</text>
+    <text class="d-t" x="700" y="463">Executar consulta</text>
+    <text class="d-t" x="700" y="478">espacial</text>
+
+    <ellipse cx="700" cy="566" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="700" y="547">UC08</text>
+    <text class="d-t" x="700" y="567">Listar resultados por</text>
+    <text class="d-t" x="700" y="582">proximidade</text>
+
+    <ellipse cx="700" cy="670" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="700" y="651">UC09</text>
+    <text class="d-t" x="700" y="671">Visualizar resultados</text>
+    <text class="d-t" x="700" y="686">no mapa</text>
+
+    <ellipse cx="700" cy="1000" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="700" y="981">UC10</text>
+    <text class="d-t" x="700" y="1001">Carregar base</text>
+    <text class="d-t" x="700" y="1016">cartográfica</text>
+
+    <!-- ===== casos de uso · coluna C (extensões + admin) ===== -->
+    <ellipse cx="980" cy="462" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="980" y="456">UC13</text>
+    <text class="d-t" x="980" y="474">Exportar resultados</text>
+
+    <ellipse cx="980" cy="566" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="980" y="547">UC11</text>
+    <text class="d-t" x="980" y="567">Ordenar resultados</text>
+    <text class="d-t" x="980" y="582">alfabeticamente</text>
+
+    <ellipse cx="980" cy="670" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="980" y="651">UC12</text>
+    <text class="d-t" x="980" y="671">Ver detalhes do</text>
+    <text class="d-t" x="980" y="686">estabelecimento</text>
+
+    <ellipse cx="980" cy="774" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="980" y="755">UC14</text>
+    <text class="d-t" x="980" y="775">Alternar camadas</text>
+    <text class="d-t" x="980" y="790">do mapa</text>
+
+    <ellipse cx="980" cy="878" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="980" y="859">UC15</text>
+    <text class="d-t" x="980" y="879">Traçar rota até o</text>
+    <text class="d-t" x="980" y="894">estabelecimento</text>
+
+    <ellipse cx="980" cy="1000" rx="105" ry="36" class="d-uc"/>
+    <text class="d-stereo" x="980" y="981">UC16</text>
+    <text class="d-t" x="980" y="1001">Manter cadastro de</text>
+    <text class="d-t" x="980" y="1016">estabelecimentos</text>
+
+    <!-- ===== associações ator ↔ caso de uso ===== -->
+    <line class="d-assoc" x1="124" y1="166" x2="325" y2="158"/>
+    <line class="d-assoc" x1="124" y1="405" x2="325" y2="400"/>
+    <line class="d-assoc" x1="124" y1="686" x2="325" y2="662"/>
+    <line class="d-assoc" x1="1276" y1="1000" x2="1085" y2="1000"/>
+    <line class="d-assoc" x1="700" y1="1080" x2="700" y2="1036"/>
+
+    <!-- ===== «include» a partir do caso base UC01 ===== -->
+    <line class="d-dash" x1="483" y1="369" x2="593" y2="152" marker-end="url(#open)"/>
+    <line class="d-dash" x1="508" y1="376" x2="593" y2="256" marker-end="url(#open)"/>
+    <line class="d-dash" x1="529" y1="388" x2="593" y2="359" marker-end="url(#open)"/>
+    <line class="d-dash" x1="529" y1="412" x2="593" y2="461" marker-end="url(#open)"/>
+    <line class="d-dash" x1="508" y1="424" x2="593" y2="564" marker-end="url(#open)"/>
+    <line class="d-dash" x1="483" y1="431" x2="593" y2="668" marker-end="url(#open)"/>
+    <text class="d-stereo" x="532" y="268">«include»</text>
+    <text class="d-stereo" x="551" y="313">«include»</text>
+    <text class="d-stereo" x="566" y="366">«include»</text>
+    <text class="d-stereo" x="566" y="446">«include»</text>
+    <text class="d-stereo" x="551" y="500">«include»</text>
+    <text class="d-stereo" x="532" y="545">«include»</text>
+
+    <!-- ===== «include» UC09 → UC10 ===== -->
+    <line class="d-dash" x1="700" y1="706" x2="700" y2="962" marker-end="url(#open)"/>
+    <text class="d-stereo" x="748" y="838">«include»</text>
+
+    <!-- ===== «extend» (a extensão aponta para o caso base) ===== -->
+    <line class="d-dash" x1="881" y1="474" x2="792" y2="548" marker-end="url(#open)"/>
+    <text class="d-stereo" x="852" y="500">«extend»</text>
+
+    <line class="d-dash" x1="875" y1="566" x2="807" y2="566" marker-end="url(#open)"/>
+    <text class="d-stereo" x="841" y="558">«extend»</text>
+
+    <line class="d-dash" x1="875" y1="670" x2="807" y2="670" marker-end="url(#open)"/>
+    <text class="d-stereo" x="841" y="662">«extend»</text>
+
+    <line class="d-dash" x1="881" y1="762" x2="792" y2="690" marker-end="url(#open)"/>
+    <text class="d-stereo" x="852" y="744">«extend»</text>
+
+    <polyline class="d-dash" points="1085,878 1140,878 1140,670 1089,670" marker-end="url(#open)"/>
+    <text class="d-stereo" x="1140" y="780">«extend»</text>
+
+    <!-- ===== legenda de notação ===== -->
+    <g>
+      <rect x="24" y="880" width="252" height="248" rx="6" class="d-legend"/>
+      <text x="40" y="906" class="d-stereo" text-anchor="start"
+            style="letter-spacing:.14em">NOTAÇÃO UML</text>
+
+      <line x1="40" y1="936" x2="86" y2="936" class="d-assoc"/>
+      <text x="98" y="940" class="d-t d-t--sm" text-anchor="start">associação</text>
+
+      <line x1="40" y1="968" x2="82" y2="968" class="d-dash" marker-end="url(#open)"/>
+      <text x="98" y="972" class="d-t d-t--sm" text-anchor="start">«include» / «extend»</text>
+
+      <line x1="40" y1="1000" x2="79" y2="1000" class="d-gen" marker-end="url(#tri)"/>
+      <text x="98" y="1004" class="d-t d-t--sm" text-anchor="start">generalização</text>
+
+      <ellipse cx="60" cy="1034" rx="19" ry="10" class="d-uc d-uc--core"/>
+      <text x="98" y="1038" class="d-t d-t--sm" text-anchor="start">caso de uso central</text>
+
+      <ellipse cx="60" cy="1066" rx="19" ry="10" class="d-uc"/>
+      <text x="98" y="1070" class="d-t d-t--sm" text-anchor="start">caso de uso de apoio</text>
+
+      <rect x="42" y="1090" width="36" height="20" rx="3" class="d-boundary"/>
+      <text x="98" y="1104" class="d-t d-t--sm" text-anchor="start">fronteira do sistema</text>
+    </g>
+   </svg>
+   <figcaption>Fig. 1 — Diagrama de casos de uso · UML 2.5 · GeoSaúde BH</figcaption>
+  </figure>
+
+  <h2>Atores</h2>
+  <table class="rel-tbl">
+    <thead><tr><th style="width:210px">Ator</th><th style="width:110px">Tipo</th><th>Responsabilidade no sistema</th></tr></thead>
+    <tbody>
+      <tr><td><b>Usuário do Sistema</b></td><td>Primário · abstrato</td>
+          <td>Generalização de quem consulta o mapa. Concentra o comportamento comum: consultar serviços de saúde a partir de um hospital de referência.</td></tr>
+      <tr><td><b>Familiar do Paciente</b></td><td>Primário</td>
+          <td>Especializa <code>Usuário do Sistema</code>. Busca farmácias próximas ao hospital em que o paciente está internado (Estória 1).</td></tr>
+      <tr><td><b>Médico</b></td><td>Primário</td>
+          <td>Especializa <code>Usuário do Sistema</code>. Busca laboratórios que realizam radiografia para encaminhar o paciente (Estória 2).</td></tr>
+      <tr><td><b>Administrador de Dados</b></td><td>Primário</td>
+          <td>Mantém a base de estabelecimentos: inclusão, alteração, exclusão e validação das coordenadas.</td></tr>
+      <tr><td><b>Provedor de Geodados</b></td><td>Secundário · sistema</td>
+          <td>Sistema externo que fornece a base cartográfica (malha viária, limites de bairro, áreas verdes) consumida pelo mapa.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Relacionamentos</h2>
+  <table class="rel-tbl">
+    <thead><tr><th style="width:250px">Origem</th><th style="width:120px">Relação</th><th style="width:250px">Destino</th><th>Justificativa</th></tr></thead>
+    <tbody>
+      <tr><td>UC02 Localizar farmácias próximas</td><td><code>generalization</code></td><td>UC01 Localizar serviços de saúde próximos</td>
+          <td>A busca de farmácias é uma variação do fluxo genérico, com a categoria fixada em <code>farmácia</code>.</td></tr>
+      <tr><td>UC03 Localizar laboratórios de radiografia próximos</td><td><code>generalization</code></td><td>UC01</td>
+          <td>Mesmo fluxo genérico, com categoria <code>laboratório</code> e restrição de exame <code>radiografia</code>.</td></tr>
+      <tr><td>UC01</td><td><code>include</code></td><td>UC04, UC05, UC06, UC07, UC08, UC09</td>
+          <td>Passos obrigatórios: sem hospital, raio, filtro, consulta espacial, listagem e mapa a busca não se completa.</td></tr>
+      <tr><td>UC09 Visualizar resultados no mapa</td><td><code>include</code></td><td>UC10 Carregar base cartográfica</td>
+          <td>O mapa só é desenhado após a base geográfica estar disponível.</td></tr>
+      <tr><td>UC11 Ordenar resultados alfabeticamente</td><td><code>extend</code></td><td>UC08 Listar resultados por proximidade</td>
+          <td>Ordenação alternativa, acionada por escolha do usuário no ponto de extensão <i>ordenação</i>.</td></tr>
+      <tr><td>UC13 Exportar resultados</td><td><code>extend</code></td><td>UC08</td>
+          <td>Opcional: só ocorre se o usuário pedir CSV, cópia ou impressão.</td></tr>
+      <tr><td>UC12 Ver detalhes do estabelecimento</td><td><code>extend</code></td><td>UC09</td>
+          <td>Opcional: depende de o usuário selecionar um marcador ou item da lista.</td></tr>
+      <tr><td>UC14 Alternar camadas do mapa</td><td><code>extend</code></td><td>UC09</td>
+          <td>Opcional: ajuste da simbologia exibida (pontos, linhas, polígonos) durante a visualização.</td></tr>
+      <tr><td>UC15 Traçar rota até o estabelecimento</td><td><code>extend</code></td><td>UC12</td>
+          <td>Opcional a partir do detalhe: desenha a linha hospital → estabelecimento e informa a distância.</td></tr>
+      <tr><td>Familiar do Paciente, Médico</td><td><code>generalization</code></td><td>Usuário do Sistema</td>
+          <td>Ambos herdam as associações do ator abstrato; cada um mantém sua associação específica.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>Leitura do diagrama para os critérios mínimos do enunciado.</b>
+    Quem busca farmácias: <i>Familiar do Paciente</i> → UC02. Quem busca laboratórios: <i>Médico</i> → UC03.
+    O hospital entra como referência via UC04, incluído pelo caso base. Raio e filtros participam por
+    UC05 e UC06, também incluídos. A visualização e a ordenação aparecem em UC08 (proximidade),
+    UC11 (alfabética) e UC09 (mapa).
+  </div>
+ </div>
+</div>
+
+<!-- ────────────────────── VISTA 3 · ESPECIFICAÇÕES ────────────────────── -->
+<div class="view doc" id="view-spec" role="tabpanel" aria-labelledby="tab-spec" hidden>
+ <div class="doc-inner">
+  <span class="eyebrow">Entregável 2</span>
+  <h1>Especificação textual dos casos de uso</h1>
+  <p class="lede">Uma tabela por caso de uso do diagrama, no formato exigido: nome, descrição,
+     fluxo principal, fluxos alternativos, pré-condições e pós-condições.</p>
+
+  <div class="uc-grid">
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC01</span><h3>Localizar serviços de saúde próximos</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Caso de uso base (abstrato). Permite ao Usuário do Sistema encontrar estabelecimentos de saúde situados dentro de um raio a partir de um hospital de referência, com o resultado apresentado em lista ordenada e no mapa.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O usuário abre o sistema e o mapa da região central é carregado (<code>«include» UC10</code>).</li>
+       <li>O usuário seleciona o hospital de referência (<code>«include» UC04</code>).</li>
+       <li>O usuário define o raio de busca (<code>«include» UC05</code>).</li>
+       <li>O usuário escolhe a categoria e os filtros de atributo (<code>«include» UC06</code>).</li>
+       <li>O usuário aciona <i>Executar consulta</i>.</li>
+       <li>O sistema executa a consulta espacial sobre a área de busca (<code>«include» UC07</code>).</li>
+       <li>O sistema calcula a distância de cada estabelecimento retornado até o hospital e ordena de forma crescente (<code>«include» UC08</code>).</li>
+       <li>O sistema desenha o polígono do raio, os marcadores numerados e ajusta o enquadramento (<code>«include» UC09</code>).</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Nenhum estabelecimento no raio: o sistema informa a ausência de resultados e sugere ampliar o raio ou relaxar os filtros; retorna ao passo 3.</li>
+       <li><b>A2.</b> O usuário altera raio, categoria ou filtros: o sistema refaz a consulta a partir do passo 5.</li>
+       <li><b>A3.</b> O usuário troca o hospital de referência: o sistema descarta o resultado atual e reinicia do passo 2.</li>
+       <li><b>E1.</b> Base cartográfica indisponível: o sistema exibe apenas as geometrias locais e registra aviso na barra de estado.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Base de hospitais e estabelecimentos carregada; navegador com suporte a SVG.</td></tr>
+     <tr><th>Pós-condições</th><td>Conjunto de resultados calculado, ordenado por distância e sincronizado entre lista e mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC02</span><h3>Localizar farmácias próximas</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Especialização de UC01. Permite ao Familiar do Paciente localizar farmácias em torno do hospital selecionado, para escolher a opção mais conveniente (Estória 1).</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O familiar seleciona o hospital em que o paciente está internado.</li>
+       <li>Define o raio de busca (por exemplo, 500 m).</li>
+       <li>Escolhe a categoria <b>Farmácia</b>; o sistema desmarca as demais categorias.</li>
+       <li>Opcionalmente aplica filtros de atributo: <i>24 horas</i>, <i>entrega</i>, <i>manipulação</i>, <i>aplicação de injetáveis</i>.</li>
+       <li>O sistema seleciona as farmácias contidas na área de busca e calcula a distância de cada uma até o hospital.</li>
+       <li>O sistema exibe a lista ordenada da mais próxima para a mais distante e os marcadores numerados no mapa.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Nenhuma farmácia encontrada no raio: o sistema informa e oferece ampliar o raio.</li>
+       <li><b>A2.</b> O familiar altera o raio e refaz a busca.</li>
+       <li><b>A3.</b> Filtro <i>24 horas</i> zera o conjunto: o sistema mantém o resultado sem o filtro e sinaliza quantos itens foram removidos.</li>
+       <li><b>A4.</b> O familiar pede ordenação alfabética (<code>«extend» UC11</code>).</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Hospital disponível e selecionado no sistema; existir ao menos uma farmácia cadastrada.</td></tr>
+     <tr><th>Pós-condições</th><td>Lista de farmácias exibida em ordem de proximidade, com marcadores correspondentes no mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC03</span><h3>Localizar laboratórios de radiografia próximos</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Especialização de UC01. Permite ao Médico localizar laboratórios que realizam radiografia próximos ao hospital, para encaminhar o paciente ao serviço mais adequado (Estória 2).</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O médico seleciona o hospital de referência.</li>
+       <li>Define o raio de busca (por exemplo, 1 km).</li>
+       <li>Escolhe a categoria <b>Laboratório</b>.</li>
+       <li>Ativa o filtro de exame <b>Radiografia</b>; o sistema descarta laboratórios que não oferecem o exame.</li>
+       <li>Opcionalmente restringe por <i>atende SUS</i> ou <i>plantão 24h</i>.</li>
+       <li>O sistema retorna os laboratórios contidos na área de busca, ordenados por distância.</li>
+       <li>O médico abre o detalhe de um laboratório e consulta exames, telefone e horário (<code>«extend» UC12</code>).</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Nenhum laboratório com radiografia no raio: o sistema informa e sugere ampliar para o próximo raio pré-definido.</li>
+       <li><b>A2.</b> O médico remove o filtro de radiografia para ver todos os laboratórios de análises.</li>
+       <li><b>A3.</b> O médico solicita a rota até o laboratório escolhido (<code>«extend» UC15</code>).</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Hospital selecionado; base de laboratórios com o atributo de exames preenchido.</td></tr>
+     <tr><th>Pós-condições</th><td>Lista de laboratórios de radiografia exibida em ordem de proximidade e plotada no mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC04</span><h3>Selecionar hospital de referência</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Define o ponto (geometria <code>POINT</code>) que serve de origem para o raio de busca e para o cálculo de todas as distâncias.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema apresenta a lista de hospitais cadastrados, com bairro e endereço.</li>
+       <li>O usuário escolhe um hospital na lista ou clica no marcador correspondente no mapa.</li>
+       <li>O sistema centraliza o mapa no hospital, destaca o marcador e exibe suas coordenadas.</li>
+       <li>O sistema identifica o bairro que contém o hospital e o registra no painel de consulta espacial.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário clica em um marcador de hospital diretamente no mapa: equivale ao passo 2.</li>
+       <li><b>A2.</b> Já existe uma consulta ativa: o sistema recalcula os resultados para o novo hospital.</li>
+       <li><b>E1.</b> Hospital sem coordenada válida: o sistema mantém a seleção anterior e sinaliza o erro.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Existir ao menos um hospital cadastrado com latitude e longitude.</td></tr>
+     <tr><th>Pós-condições</th><td>Hospital de referência definido; mapa centralizado; bairro contenedor identificado.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC05</span><h3>Definir raio de busca</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Estabelece a distância máxima, em metros, que delimita a área de busca. O sistema materializa esse raio como um polígono circular (<i>buffer</i>) em torno do hospital.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema exibe os raios pré-definidos de 200 m, 500 m, 1 km e 2 km, além de um controle contínuo.</li>
+       <li>O usuário escolhe um valor pré-definido ou arrasta o controle entre 100 m e 3.000 m.</li>
+       <li>O sistema atualiza o rótulo numérico do raio.</li>
+       <li>O sistema redesenha o polígono de busca, a marca de escala e o rótulo de raio no mapa.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Valor fora do intervalo permitido: o sistema limita ao mínimo ou máximo e avisa o usuário.</li>
+       <li><b>A2.</b> Existe consulta ativa: o resultado é recalculado a cada mudança do raio.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Hospital de referência selecionado (UC04).</td></tr>
+     <tr><th>Pós-condições</th><td>Raio definido e polígono de busca desenhado sobre o mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC06</span><h3>Filtrar por categoria e atributos</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Restringe o conjunto de estabelecimentos por tipo (hospital, farmácia, laboratório, UBS) e por atributos não espaciais, antes ou depois da consulta espacial.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema apresenta as categorias com sua cor de simbologia e a contagem de registros de cada uma.</li>
+       <li>O usuário marca ou desmarca as categorias desejadas.</li>
+       <li>O sistema apresenta os filtros de atributo pertinentes às categorias marcadas.</li>
+       <li>O usuário ativa os filtros desejados (por exemplo, <i>24 horas</i> ou <i>radiografia</i>).</li>
+       <li>O sistema aplica os filtros e atualiza lista, mapa e contadores.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Nenhuma categoria marcada: o sistema esvazia a lista e informa que ao menos uma categoria deve ser selecionada.</li>
+       <li><b>A2.</b> A combinação de filtros não retorna registros: o sistema informa quais filtros eliminaram todos os itens.</li>
+       <li><b>A3.</b> O usuário limpa os filtros de atributo e mantém apenas a categoria.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Base de estabelecimentos carregada com os atributos correspondentes.</td></tr>
+     <tr><th>Pós-condições</th><td>Conjunto de candidatos restrito às categorias e atributos escolhidos.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC07</span><h3>Executar consulta espacial</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Aplica os operadores topológicos entre a área de busca e as camadas de pontos, linhas e polígonos: <code>ST_Contains</code>, <code>ST_Within</code> e <code>ST_Intersects</code>.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema monta o polígono de busca a partir do hospital e do raio.</li>
+       <li><b>Está contido:</b> seleciona os pontos de estabelecimento cuja geometria está contida no polígono de busca.</li>
+       <li><b>Contém:</b> identifica o polígono de bairro que contém o hospital e verifica quais bairros contêm integralmente a área de busca.</li>
+       <li><b>Intercepta:</b> seleciona as vias (linhas) e os bairros (polígonos) que interceptam a área de busca.</li>
+       <li>O sistema calcula a distância de cada estabelecimento selecionado ao hospital pela fórmula de Haversine.</li>
+       <li>O sistema exibe a consulta em notação pseudo-SQL e o resumo de cada predicado no painel de consulta espacial.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O predicado <i>está contido</i> retorna conjunto vazio: os demais predicados continuam sendo apresentados.</li>
+       <li><b>A2.</b> A área de busca ultrapassa a extensão da base carregada: o sistema avisa que o resultado pode estar incompleto.</li>
+       <li><b>E1.</b> Geometria inválida na base: o registro é ignorado e contabilizado como inconsistência.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Hospital (UC04), raio (UC05) e filtros (UC06) definidos.</td></tr>
+     <tr><th>Pós-condições</th><td>Conjunto-resposta calculado com distâncias e resultado dos três predicados topológicos disponível.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC08</span><h3>Listar resultados por proximidade</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Apresenta os estabelecimentos retornados em lista ordenada pela menor distância até o hospital, com posição, distância e tempo estimado de caminhada.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema ordena o conjunto-resposta pela distância crescente.</li>
+       <li>O sistema atribui a cada item uma posição sequencial, que é a mesma exibida no marcador do mapa.</li>
+       <li>Para cada item exibe nome, endereço, distância em metros, tempo de caminhada estimado e os atributos em destaque.</li>
+       <li>O sistema informa o total de estabelecimentos encontrados.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Conjunto vazio: o sistema exibe estado vazio com orientação para ampliar o raio ou revisar os filtros.</li>
+       <li><b>A2.</b> O usuário troca a ordenação para alfabética (<code>«extend» UC11</code>); as posições numéricas continuam refletindo a proximidade.</li>
+       <li><b>A3.</b> O usuário exporta a lista (<code>«extend» UC13</code>).</li>
+       <li><b>A4.</b> Empate de distância: o sistema desempata por ordem alfabética do nome.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Consulta espacial executada (UC07).</td></tr>
+     <tr><th>Pós-condições</th><td>Lista ordenada exibida e sincronizada com os marcadores do mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC09</span><h3>Visualizar resultados no mapa</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Desenha no mapa o hospital, o polígono do raio e os estabelecimentos encontrados, mantendo a simbologia por categoria e a sincronia com a lista.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema desenha as camadas de fundo: bairros (polígonos), áreas verdes (polígonos) e malha viária (linhas).</li>
+       <li>Desenha o polígono do raio com a marca e o rótulo da distância.</li>
+       <li>Plota o hospital com símbolo próprio e os estabelecimentos com a cor da sua categoria e a posição da lista.</li>
+       <li>Ajusta o enquadramento para que a área de busca fique inteiramente visível.</li>
+       <li>Ao passar o cursor sobre um item da lista, destaca o marcador correspondente, e vice-versa.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário navega no mapa com arrastar, roda do mouse ou botões de zoom.</li>
+       <li><b>A2.</b> O usuário altera as camadas visíveis (<code>«extend» UC14</code>).</li>
+       <li><b>A3.</b> O usuário clica em um marcador e abre o detalhe (<code>«extend» UC12</code>).</li>
+       <li><b>A4.</b> Muitos marcadores sobrepostos: os rótulos são omitidos em escalas menores, preservando os símbolos.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Base cartográfica carregada (UC10) e consulta executada (UC07).</td></tr>
+     <tr><th>Pós-condições</th><td>Mapa renderizado com a área de busca e os resultados; lista e mapa sincronizados.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC10</span><h3>Carregar base cartográfica</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Obtém junto ao Provedor de Geodados as camadas de referência — limites de bairro, malha viária e áreas verdes — e as prepara para renderização.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema solicita as camadas de referência da área central de Belo Horizonte.</li>
+       <li>O Provedor de Geodados devolve as geometrias em coordenadas geográficas (EPSG:4326).</li>
+       <li>O sistema projeta as geometrias para Web Mercator e monta o índice de desenho.</li>
+       <li>O sistema informa na barra de estado a quantidade de feições carregadas por camada.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>E1.</b> Provedor indisponível: o sistema usa a base local embarcada e sinaliza o modo degradado.</li>
+       <li><b>E2.</b> Geometria fora da área de interesse: é descartada no recorte.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Aplicação iniciada no navegador.</td></tr>
+     <tr><th>Pós-condições</th><td>Camadas de referência disponíveis para desenho e para os operadores topológicos.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC11</span><h3>Ordenar resultados alfabeticamente</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC08. Reordena a lista pelo nome do estabelecimento, em ordem crescente ou decrescente, sem alterar o conjunto retornado pela consulta.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>No ponto de extensão <i>ordenação</i>, o usuário escolhe <b>A → Z</b> ou <b>Z → A</b>.</li>
+       <li>O sistema reordena a lista pelo nome, ignorando maiúsculas e acentuação.</li>
+       <li>O sistema mantém em cada item a posição de proximidade e a distância, para que a referência espacial não se perca.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário retorna à ordenação por proximidade.</li>
+       <li><b>A2.</b> Nomes idênticos: desempate pela distância crescente.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Lista de resultados exibida (UC08) com ao menos dois itens.</td></tr>
+     <tr><th>Pós-condições</th><td>Lista reordenada alfabeticamente, com o mesmo conjunto de estabelecimentos.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC12</span><h3>Ver detalhes do estabelecimento</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC09. Exibe a ficha completa de um estabelecimento selecionado na lista ou no mapa.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O usuário clica no marcador do mapa ou no item da lista.</li>
+       <li>O sistema abre o cartão de detalhe junto ao marcador e destaca o item correspondente na lista.</li>
+       <li>O cartão apresenta nome, categoria, endereço, bairro, telefone, horário, atributos, coordenadas e distância até o hospital.</li>
+       <li>O usuário fecha o cartão ou seleciona outro estabelecimento.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário solicita a rota até o estabelecimento (<code>«extend» UC15</code>).</li>
+       <li><b>A2.</b> Atributo ausente no cadastro: o campo é exibido como <i>não informado</i>.</li>
+       <li><b>A3.</b> O usuário pressiona <kbd>Esc</kbd>: o cartão é fechado e a seleção, mantida.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Estabelecimento presente no conjunto-resposta e visível no mapa.</td></tr>
+     <tr><th>Pós-condições</th><td>Detalhes exibidos e estabelecimento marcado como selecionado em lista e mapa.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC13</span><h3>Exportar resultados</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC08. Permite levar o resultado da consulta para fora do sistema em CSV, área de transferência ou impressão.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O usuário escolhe o formato: <b>CSV</b>, <b>copiar lista</b> ou <b>imprimir</b>.</li>
+       <li>O sistema monta o conteúdo com posição, nome, categoria, endereço, distância e coordenadas.</li>
+       <li>O sistema entrega o arquivo, copia o texto ou abre a caixa de impressão.</li>
+       <li>O sistema confirma a ação na barra de estado.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Lista vazia: a exportação é bloqueada e o sistema avisa que não há resultados.</li>
+       <li><b>E1.</b> Navegador nega acesso à área de transferência: o sistema exibe o texto para cópia manual.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Consulta executada com ao menos um resultado.</td></tr>
+     <tr><th>Pós-condições</th><td>Resultado entregue no formato escolhido; conjunto-resposta inalterado.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC14</span><h3>Alternar camadas do mapa</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC09. Controla a visibilidade das camadas temáticas — bairros (polígonos), vias principais e malha viária (linhas), áreas verdes (polígonos) e rótulos.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O sistema lista as camadas disponíveis com o respectivo tipo de geometria e o estado atual.</li>
+       <li>O usuário liga ou desliga uma camada.</li>
+       <li>O sistema redesenha o mapa preservando o enquadramento, a seleção e o resultado da consulta.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Todas as camadas de fundo desligadas: permanecem visíveis o raio, o hospital e os resultados.</li>
+       <li><b>A2.</b> Rótulos desligados: os símbolos continuam sendo desenhados.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Mapa renderizado (UC09).</td></tr>
+     <tr><th>Pós-condições</th><td>Composição do mapa atualizada conforme a escolha do usuário.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC15</span><h3>Traçar rota até o estabelecimento</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Extensão de UC12. Desenha a linha de ligação entre o hospital e o estabelecimento escolhido e informa a distância e o tempo estimado de caminhada.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>No cartão de detalhe, o usuário aciona <i>Traçar rota</i>.</li>
+       <li>O sistema desenha a linha (geometria <code>LINESTRING</code>) do hospital ao estabelecimento.</li>
+       <li>O sistema exibe a distância em linha reta e o tempo estimado de caminhada a 5 km/h.</li>
+       <li>O sistema ajusta o enquadramento para conter os dois pontos.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> O usuário traça a rota para outro estabelecimento: a linha anterior é substituída.</li>
+       <li><b>A2.</b> O usuário limpa a rota, retornando à visualização anterior.</li>
+       <li><b>N1.</b> A rota é uma aproximação em linha reta; o protótipo não consulta serviço de roteamento por vias.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Estabelecimento selecionado com detalhes abertos (UC12).</td></tr>
+     <tr><th>Pós-condições</th><td>Linha de rota desenhada e medida apresentada ao usuário.</td></tr>
+    </table>
+   </article>
+
+   <article class="uc">
+    <div class="uc-hd"><span class="uc-id">UC16</span><h3>Manter cadastro de estabelecimentos</h3></div>
+    <table>
+     <tr><th>Descrição</th><td>Permite ao Administrador de Dados incluir, alterar e excluir estabelecimentos, garantindo que cada registro tenha categoria, atributos e coordenadas válidas.</td></tr>
+     <tr><th>Fluxo principal</th><td><ol>
+       <li>O administrador se autentica e abre a manutenção do cadastro.</li>
+       <li>Escolhe incluir, alterar ou excluir um registro.</li>
+       <li>Informa nome, categoria, endereço, bairro, telefone, horário, atributos e coordenadas.</li>
+       <li>O sistema valida os campos obrigatórios e verifica se a coordenada está dentro da área de cobertura.</li>
+       <li>O sistema grava o registro e atualiza os contadores por categoria.</li>
+     </ol></td></tr>
+     <tr><th>Fluxos alternativos</th><td><ul>
+       <li><b>A1.</b> Coordenada fora da área de cobertura: o sistema recusa a gravação e destaca o campo.</li>
+       <li><b>A2.</b> Exclusão de registro em uso na consulta corrente: o sistema pede confirmação.</li>
+       <li><b>E1.</b> Falha na gravação: a operação é desfeita e o administrador é notificado.</li>
+     </ul></td></tr>
+     <tr><th>Pré-condições</th><td>Administrador autenticado com perfil de manutenção.</td></tr>
+     <tr><th>Pós-condições</th><td>Base de estabelecimentos atualizada e disponível para as próximas consultas.</td></tr>
+    </table>
+   </article>
+
+  </div>
+
+  <div class="note" style="margin-top:26px">
+    <b>Cobertura.</b> As 16 tabelas correspondem, uma a uma, aos 16 casos de uso do diagrama da Fig. 1.
+    Os casos UC02 e UC03 materializam as Estórias 1 e 2 do enunciado; UC07 concentra os operadores
+    <code>está contido</code>, <code>contém</code> e <code>intercepta</code>; UC08 e UC11 cobrem a
+    ordenação por aproximação e a alfabética.
+  </div>
+ </div>
+</div>
+
+</div><!-- /body -->
+
+<!-- ============================ RODAPÉ ============================ -->
+<footer class="foot">
+  <span>SRC <b>EPSG:4326</b> · proj. <b>Web Mercator</b></span>
+  <span id="ft-coord">—</span>
+  <span id="ft-zoom">z —</span>
+  <span id="ft-feat">—</span>
+  <span class="grow" id="ft-status">Pronto</span>
+</footer>
+
+</div><!-- /app -->
+
+<script>
+"use strict";
+/* ==========================================================================
+   GeoSaúde BH — protótipo WebGIS
+   Sem dependências externas: projeção, renderização e operadores topológicos
+   implementados aqui para deixar a lógica SIG explícita e auditável.
+   --------------------------------------------------------------------------
+   AVISO SOBRE OS DADOS
+   Hospitais: coordenadas aproximadas de unidades reais de Belo Horizonte.
+   Farmácias, laboratórios, UBS, limites de bairro e malha viária: dados
+   SINTÉTICOS, gerados de forma determinística apenas para fins didáticos.
+   Não devem ser usados para decisão real de atendimento.
+   ========================================================================== */
+
+/* ─────────────────────────── 1 · MATEMÁTICA ─────────────────────────── */
+
+const CENTER  = { lat: -19.9235, lon: -43.9390 };            // Centro-Sul de BH
+const MPD_LAT = 111320;
+const MPD_LON = 111320 * Math.cos(CENTER.lat * Math.PI / 180);
+const THETA   = -49 * Math.PI / 180;                          // giro da malha central
+const U = { x:  Math.cos(THETA), y: Math.sin(THETA) };        // eixo "a" (NO→SE)
+const V = { x: -Math.sin(THETA), y: Math.cos(THETA) };        // eixo "b" (SO→NE)
+
+/** Coordenadas locais (a,b) em metros → geográficas. */
+function ab(a, b){
+  const x = a * U.x + b * V.x, y = a * U.y + b * V.y;
+  return { lat: CENTER.lat + y / MPD_LAT, lon: CENTER.lon + x / MPD_LON };
+}
+/** Geográficas → coordenadas locais (a,b) em metros. */
+function toAB(lat, lon){
+  const x = (lon - CENTER.lon) * MPD_LON, y = (lat - CENTER.lat) * MPD_LAT;
+  return { a: x * U.x + y * U.y, b: x * V.x + y * V.y };
+}
+/** Distância geodésica (Haversine), em metros. */
+function haversine(p, q){
+  const R = 6371008.8, r = Math.PI / 180;
+  const dLat = (q.lat - p.lat) * r, dLon = (q.lon - p.lon) * r;
+  const s = Math.sin(dLat/2)**2 +
+            Math.cos(p.lat*r) * Math.cos(q.lat*r) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+/** Distância de ponto a segmento, em coordenadas locais. */
+function distPtSeg(p, s0, s1){
+  const dx = s1.a - s0.a, dy = s1.b - s0.b;
+  const L2 = dx*dx + dy*dy;
+  let t = L2 ? ((p.a - s0.a)*dx + (p.b - s0.b)*dy) / L2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.a - (s0.a + t*dx), p.b - (s0.b + t*dy));
+}
+/** Menor distância entre o retângulo [aMin..aMax]×[bMin..bMax] e o ponto p. */
+function distPtRect(p, r){
+  const da = Math.max(r.aMin - p.a, 0, p.a - r.aMax);
+  const db = Math.max(r.bMin - p.b, 0, p.b - r.bMax);
+  return Math.hypot(da, db);
+}
+function inRect(p, r){
+  return p.a >= r.aMin && p.a <= r.aMax && p.b >= r.bMin && p.b <= r.bMax;
+}
+/** Gerador pseudoaleatório determinístico — a base sintética nunca muda. */
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const norm  = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/* ─────────────────────────── 2 · CAMADAS BASE ─────────────────────────── */
+
+/* Extensão da área de estudo — elipse aproximando o anel da Av. do Contorno. */
+const EXT = { A: 2420, B: 2210 };
+
+const OP = 'Área de estudo · anel da Av. do Contorno';
+
+/* --- polígonos de bairro (limites simplificados, alinhados à malha) --- */
+const BAIRROS = [
+  { nome:'Lagoinha',       aMin:-2420, aMax:-800,  bMin:-2210, bMax:-700  },
+  { nome:'Barro Preto',    aMin:-800,  aMax:700,   bMin:-2210, bMax:-700  },
+  { nome:'Lourdes',        aMin:700,   aMax:2420,  bMin:-2210, bMax:-700  },
+  { nome:'Centro',         aMin:-2420, aMax:700,   bMin:-700,  bMax:600   },
+  { nome:'Funcionários',   aMin:700,   aMax:2420,  bMin:-700,  bMax:600   },
+  { nome:'Floresta',       aMin:-2420, aMax:-800,  bMin:600,   bMax:2210  },
+  { nome:'Santa Efigênia', aMin:-800,  aMax:700,   bMin:600,   bMax:2210  },
+  { nome:'Serra',          aMin:700,   aMax:2420,  bMin:600,   bMax:2210  }
+];
+BAIRROS.forEach(b => {
+  b.ring = [ ab(b.aMin,b.bMin), ab(b.aMax,b.bMin), ab(b.aMax,b.bMax), ab(b.aMin,b.bMax) ];
+  b.centro = ab((b.aMin+b.aMax)/2, (b.bMin+b.bMax)/2);
+});
+
+/* --- áreas verdes (polígonos) --- */
+const PARQUES = [
+  { nome:'Parque Municipal',    aMin:120,  aMax:430,  bMin:130,  bMax:520  },
+  { nome:'Praça da Liberdade',  aMin:720,  aMax:920,  bMin:-600, bMax:-400 },
+  { nome:'Praça da Estação',    aMin:-660, aMax:-450, bMin:460,  bMax:650  },
+  { nome:'Praça Raul Soares',   aMin:-140, aMax:40,   bMin:-600, bMax:-440 },
+  { nome:'Praça Floriano',      aMin:1420, aMax:1600, bMin:900,  bMax:1080 }
+];
+PARQUES.forEach(p => {
+  p.ring = [ ab(p.aMin,p.bMin), ab(p.aMax,p.bMin), ab(p.aMax,p.bMax), ab(p.aMin,p.bMax) ];
+  p.centro = ab((p.aMin+p.aMax)/2, (p.bMin+p.bMax)/2);
+});
+
+/* --- vias principais (linhas) --- axis:'b' => b constante (via corre NO→SE);
+       axis:'a' => a constante (via corre SO→NE) ------------------------------ */
+const VIAS = [
+  { nome:'Av. Afonso Pena',          axis:'b', at:324,  from:-1900, to:2200 },
+  { nome:'R. da Bahia',              axis:'b', at:456,  from:-1900, to:2100 },
+  { nome:'R. dos Guajajaras',        axis:'b', at:60,   from:-1800, to:1700 },
+  { nome:'Av. Brasil',               axis:'b', at:720,  from:-1700, to:2000 },
+  { nome:'Av. Prof. Alfredo Balena', axis:'b', at:984,  from:-1100, to:1300 },
+  { nome:'R. dos Otoni',             axis:'b', at:1116, from:-900,  to:1400 },
+  { nome:'Av. Francisco Sales',      axis:'b', at:1248, from:-800,  to:1500 },
+  { nome:'Av. Assis Chateaubriand',  axis:'b', at:1512, from:-500,  to:1000 },
+  { nome:'R. Curitiba',              axis:'a', at:-565, from:-1900, to:1500 },
+  { nome:'Av. Amazonas',             axis:'a', at:-309, from:-2100, to:1500 },
+  { nome:'Av. Augusto de Lima',      axis:'a', at:-53,  from:-1900, to:1600 },
+  { nome:'Av. Olegário Maciel',      axis:'a', at:459,  from:-1900, to:1400 },
+  { nome:'Av. Álvares Cabral',       axis:'a', at:843,  from:-1800, to:900  },
+  { nome:'Av. Bias Fortes',          axis:'a', at:1099, from:-1800, to:700  },
+  { nome:'Av. Bernardo Monteiro',    axis:'a', at:1355, from:-1300, to:1500 }
+];
+
+/* Recorte analítico de cada via pela elipse da área de estudo. */
+function clipAxis(axis, at, from, to){
+  const other = axis === 'b' ? EXT.A : EXT.B;   // semi-eixo do sentido livre
+  const fixed = axis === 'b' ? EXT.B : EXT.A;   // semi-eixo do sentido travado
+  const k = 1 - (at / fixed) ** 2;
+  if (k <= 0) return null;
+  const half = other * Math.sqrt(k);
+  const lo = Math.max(from, -half), hi = Math.min(to, half);
+  return hi - lo < 60 ? null : [lo, hi];
+}
+VIAS.forEach(v => {
+  const seg = clipAxis(v.axis, v.at, v.from, v.to);
+  v.ok = !!seg;
+  if (!seg) return;
+  [v.lo, v.hi] = seg;
+  v.p0 = v.axis === 'b' ? { a:v.lo, b:v.at } : { a:v.at, b:v.lo };
+  v.p1 = v.axis === 'b' ? { a:v.hi, b:v.at } : { a:v.at, b:v.hi };
+  v.ll0 = ab(v.p0.a, v.p0.b);
+  v.ll1 = ab(v.p1.a, v.p1.b);
+});
+
+/* --- malha viária secundária (linhas), na mesma orientação da malha central --- */
+const QUADRAS = [];
+for (let k = -16; k <= 16; k++){
+  const at = 324 + k * 132;
+  if (VIAS.some(v => v.axis === 'b' && Math.abs(v.at - at) < 30)) continue;
+  const seg = clipAxis('b', at, -2400, 2400);
+  if (seg) QUADRAS.push({ ll0: ab(seg[0], at), ll1: ab(seg[1], at) });
+}
+for (let j = -18; j <= 18; j++){
+  const at = -309 + j * 128;
+  if (VIAS.some(v => v.axis === 'a' && Math.abs(v.at - at) < 30)) continue;
+  const seg = clipAxis('a', at, -2400, 2400);
+  if (seg) QUADRAS.push({ ll0: ab(at, seg[0]), ll1: ab(at, seg[1]) });
+}
+
+/* --- anel da Av. do Contorno (polígono/linha de contorno da área) --- */
+const CONTORNO = [];
+for (let i = 0; i <= 64; i++){
+  const t = i / 64 * Math.PI * 2;
+  CONTORNO.push(ab(Math.cos(t) * EXT.A, Math.sin(t) * EXT.B));
+}
+
+/* ─────────────────────────── 3 · ESTABELECIMENTOS ─────────────────────────── */
+
+const CATS = {
+  hospital:    { nome:'Hospital',      cor:'--sig-hospital' },
+  farmacia:    { nome:'Farmácia',      cor:'--sig-farmacia' },
+  laboratorio: { nome:'Laboratório',   cor:'--sig-lab'      },
+  ubs:         { nome:'UBS / Clínica', cor:'--sig-ubs'      }
+};
+
+const HOSPITAIS = [
+  { id:'HC', curto:'HC-UFMG',  nome:'Hospital das Clínicas da UFMG', lat:-19.9186, lon:-43.9333,
+    end:'Av. Prof. Alfredo Balena, 110', tel:'(31) 3409-9300', porte:'Terciário · ensino' },
+  { id:'SCM', curto:'Santa Casa', nome:'Santa Casa de Misericórdia de BH', lat:-19.9207, lon:-43.9294,
+    end:'Av. Francisco Sales, 1111', tel:'(31) 3238-8100', porte:'Terciário · filantrópico' },
+  { id:'JXX', curto:'João XXIII', nome:'Hospital de Pronto-Socorro João XXIII', lat:-19.9163, lon:-43.9330,
+    end:'Av. Prof. Alfredo Balena, 400', tel:'(31) 3239-9200', porte:'Urgência e trauma' },
+  { id:'FR', curto:'Felício Rocho',  nome:'Hospital Felício Rocho', lat:-19.9312, lon:-43.9503,
+    end:'Av. do Contorno, 9530', tel:'(31) 3514-7000', porte:'Geral · privado' },
+  { id:'MD', curto:'Mater Dei',  nome:'Hospital Mater Dei', lat:-19.9367, lon:-43.9411,
+    end:'R. Mato Grosso, 1100', tel:'(31) 3339-9000', porte:'Geral · privado' },
+  { id:'VC', curto:'Vera Cruz',  nome:'Hospital Vera Cruz', lat:-19.9282, lon:-43.9455,
+    end:'Av. Barbacena, 653', tel:'(31) 3290-3000', porte:'Geral · privado' }
+];
+HOSPITAIS.forEach(h => { h.cat = 'hospital'; Object.assign(h, toAB(h.lat, h.lon)); });
+
+/* --- geração determinística da base sintética --- */
+const FARM_A = ['Drogaria','Farmácia','Drogaria','Farmácia','Drogaria Rede','Farmácia Central'];
+const FARM_B = ['Balena','Santa Efigênia','São Judas','Otoni','Minas','Vida Plena','Bem-Estar',
+  'Contorno','Aliança','Cristal','Guajajaras','Floresta','Lourdes','Ipiranga','Serra','Curitiba',
+  'Espírito Santo','Bahia','Sete de Setembro','Liberdade','Boa Viagem','Carijós','Tupinambás',
+  'Goitacazes','Timbiras','Paraíba','Sergipe','Alagoas','Pernambuco','Rio Grande','Tamoios',
+  'Caetés','Aimorés','Gonçalves Dias','Levindo Lopes','Pium-í','Fernandes Tourinho','Sapucaí',
+  'Inconfidentes','Mantiqueira','Serrana','Mangabeiras','Sion','Cruzeiro','Anchieta','Barroca',
+  'Bonfim','Prado','Carmo','Aurora'];
+const LAB_A = ['Laboratório','Centro de Imagem','Instituto de Radiologia','Clínica de Diagnóstico',
+  'Centro Radiológico','Laboratório de Análises','Núcleo de Imagem'];
+const LAB_B = ['Balena','Santa Efigênia','Otoni','Minas','Contorno','Savassi','Lourdes',
+  'Barro Preto','Floresta','Serra','Precisão','Vita','Alfa','Central','Bandeirantes','Ipiranga',
+  'Cristal','São Marcos','Nova Era','Horizonte','Aurora','Íris','Vetor','Ômega','Prisma','Zênite',
+  'Vértice','Áurea','Meridiano','Cardeal','Estrela','Radial','Nova Imagem','Panorama','Farol',
+  'Pilar','Âncora','Sirius','Atlas','Vega'];
+const UBS_A = ['UBS','Centro de Saúde','Clínica Municipal'];
+const UBS_B = ['Santa Efigênia','Centro','Floresta','Barro Preto','Lourdes','Serra',
+  'Funcionários','Lagoinha','Bonfim','Prado','Carlos Prates','São Cristóvão','Cidade Jardim','Sion'];
+
+const EXAMES = ['Radiografia','Tomografia','Ultrassonografia','Ressonância magnética',
+  'Mamografia','Densitometria óssea','Análises clínicas'];
+
+let uid = 0;
+const PONTOS = [];
+
+/** Cria um estabelecimento ancorado na malha viária. */
+function makePoint(cat, i, rnd, anchor){
+  let a, b;
+  if (anchor){                                   // agrupamento junto a um hospital
+    const ang = rnd() * Math.PI * 2;
+    const d   = 110 + rnd() * 230;
+    a = anchor.a + Math.cos(ang) * d;
+    b = anchor.b + Math.sin(ang) * d;
+  } else {                                       // espalhado pela área de estudo
+    const t = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 0.94;
+    a = Math.cos(t) * EXT.A * r;
+    b = Math.sin(t) * EXT.B * r;
+  }
+  /* encaixa na esquina mais próxima da malha, com pequeno recuo de calçada */
+  const kb = Math.round((b - 324) / 132) * 132 + 324;
+  const ja = Math.round((a + 309) / 128) * 128 - 309;
+  if (rnd() < 0.5) { b = kb + (rnd() - 0.5) * 14; a = ja + (rnd() - 0.5) * 96; }
+  else             { a = ja + (rnd() - 0.5) * 14; b = kb + (rnd() - 0.5) * 96; }
+  if ((a/EXT.A)**2 + (b/EXT.B)**2 > 0.99) return null;
+
+  const ll = ab(a, b);
+  const p = { id:'E' + (++uid), cat, a, b, lat:ll.lat, lon:ll.lon };
+
+  if (cat === 'farmacia'){
+    p.nome = FARM_A[i % FARM_A.length] + ' ' + FARM_B[i % FARM_B.length];
+    p.h24 = rnd() < 0.22;
+    p.entrega = rnd() < 0.62;
+    p.manipulacao = rnd() < 0.18;
+    p.injetavel = rnd() < 0.40;
+  } else if (cat === 'laboratorio'){
+    p.nome = LAB_A[i % LAB_A.length] + ' ' + LAB_B[i % LAB_B.length];
+    const set = new Set(['Análises clínicas']);
+    if (rnd() < 0.68) set.add('Radiografia');
+    if (rnd() < 0.34) set.add('Tomografia');
+    if (rnd() < 0.46) set.add('Ultrassonografia');
+    if (rnd() < 0.17) set.add('Ressonância magnética');
+    if (rnd() < 0.22) set.add('Mamografia');
+    if (rnd() < 0.14) set.add('Densitometria óssea');
+    p.exames = EXAMES.filter(e => set.has(e));
+    p.radiografia = set.has('Radiografia');
+    p.tomografia  = set.has('Tomografia');
+    p.ultrassom   = set.has('Ultrassonografia');
+    p.h24 = rnd() < 0.12;
+    p.sus = rnd() < 0.44;
+  } else {
+    p.nome = UBS_A[i % UBS_A.length] + ' ' + UBS_B[i % UBS_B.length];
+    p.sus = true;
+    p.h24 = false;
+  }
+
+  const bairro = BAIRROS.find(x => inRect(p, x));
+  p.bairro = bairro ? bairro.nome : 'Área central';
+  const via = VIAS.filter(v => v.ok)
+    .map(v => ({ v, d: distPtSeg(p, v.p0, v.p1) }))
+    .sort((x, y) => x.d - y.d)[0];
+  p.endereco = (via ? via.v.nome : 'Via local') + ', ' + (60 + (uid * 37) % 1940);
+  p.tel = '(31) 3' + (100 + (uid * 91) % 899) + '-' + (1000 + (uid * 613) % 8999);
+  p.horario = p.h24 ? 'Aberto 24 horas'
+            : (cat === 'farmacia' ? 'Seg a sáb, 07h–22h · dom, 08h–20h'
+                                  : 'Seg a sex, 06h30–19h · sáb, 07h–13h');
+  return p;
+}
+
+(function buildBase(){
+  const rnd = mulberry32(19351207);              // fundação de BH — semente fixa
+  let fi = 0, li = 0, ui2 = 0, guard = 0;
+  const push = (cat, idx, anchor) => {
+    let p = null;
+    while (!p && guard++ < 20000) p = makePoint(cat, idx, rnd, anchor);
+    if (p) PONTOS.push(p);
+  };
+  for (let n = 0; n < 84; n++) push('farmacia', fi++);
+  for (let n = 0; n < 56; n++) push('laboratorio', li++);
+  for (let n = 0; n < 14; n++) push('ubs', ui2++);
+  HOSPITAIS.forEach(h => {                        // adensamento junto aos hospitais
+    for (let n = 0; n < 3; n++) push('farmacia', fi++, h);
+    for (let n = 0; n < 2; n++) push('laboratorio', li++, h);
+  });
+})();
+
+const TODOS = [...HOSPITAIS, ...PONTOS];
+
+/* ─────────────────────────── 4 · ESTADO ─────────────────────────── */
+
+const state = {
+  hospital: HOSPITAIS[0],
+  radius: 500,
+  cats: new Set(['farmacia']),
+  attrs: new Set(),
+  sort: 'dist',
+  layers: { bairros:true, vias:true, quadras:true, parques:true, rotulos:true },
+  results: [],
+  selected: null,
+  hover: null,
+  route: null,
+  spatial: null
+};
+
+const view = { lat: CENTER.lat, lon: CENTER.lon, zoom: 15.1 };
+
+/* ─────────────────────────── 5 · PROJEÇÃO / RENDER ─────────────────────────── */
+
+const svg   = document.getElementById('map');
+const stage = document.getElementById('stage');
+let VW = 800, VH = 600;
+
+function worldPx(lat, lon, z){
+  const s = 256 * Math.pow(2, z);
+  const sinLat = clamp(Math.sin(lat * Math.PI / 180), -0.9999, 0.9999);
+  return {
+    x: (lon + 180) / 360 * s,
+    y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * s
+  };
+}
+function metersPerPixel(){
+  return 156543.03392 * Math.cos(view.lat * Math.PI / 180) / Math.pow(2, view.zoom);
+}
+let ORIGIN = { x:0, y:0 };
+function refreshOrigin(){
+  const c = worldPx(view.lat, view.lon, view.zoom);
+  ORIGIN = { x: c.x - VW / 2, y: c.y - VH / 2 };
+}
+function P(lat, lon){
+  const p = worldPx(lat, lon, view.zoom);
+  return [p.x - ORIGIN.x, p.y - ORIGIN.y];
+}
+function unproject(px, py){
+  const s = 256 * Math.pow(2, view.zoom);
+  const lon = (px + ORIGIN.x) / s * 360 - 180;
+  const n = Math.PI - 2 * Math.PI * (py + ORIGIN.y) / s;
+  const lat = 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  return { lat, lon };
+}
+const f1 = n => Math.round(n * 10) / 10;
+function ptsPath(list){
+  let d = '';
+  for (let i = 0; i < list.length; i++){
+    const [x, y] = P(list[i].lat, list[i].lon);
+    d += (i ? 'L' : 'M') + f1(x) + ' ' + f1(y);
+  }
+  return d;
+}
+function seg(p0, p1){
+  const [x0, y0] = P(p0.lat, p0.lon), [x1, y1] = P(p1.lat, p1.lon);
+  return { x0, y0, x1, y1,
+    off: (x0 < -60 && x1 < -60) || (x0 > VW+60 && x1 > VW+60) ||
+         (y0 < -60 && y1 < -60) || (y0 > VH+60 && y1 > VH+60) };
+}
+const esc = s => String(s).replace(/[&<>"]/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+/** Círculo geodésico aproximado — o polígono do raio de busca. */
+function bufferRing(center, radiusM, n = 96){
+  const ring = [];
+  const dLat = radiusM / MPD_LAT;
+  const dLon = radiusM / (111320 * Math.cos(center.lat * Math.PI / 180));
+  for (let i = 0; i <= n; i++){
+    const t = i / n * Math.PI * 2;
+    ring.push({ lat: center.lat + Math.sin(t) * dLat, lon: center.lon + Math.cos(t) * dLon });
+  }
+  return ring;
+}
+
+let raf = 0;
+function draw(){ if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
+
+function render(){
+  refreshOrigin();
+  const L = state.layers;
+  const H = state.hospital;
+  const showLbl = L.rotulos;
+  let out = '';
+
+  /* --- polígonos: bairros --- */
+  if (L.bairros){
+    out += '<g>';
+    for (const b of BAIRROS){
+      const hit = state.spatial && state.spatial.bairrosIntersect.includes(b.nome);
+      out += `<path class="bairro${hit ? ' hit' : ''}" d="${ptsPath(b.ring)}Z"/>`;
+    }
+    out += '</g>';
+  }
+
+  /* --- polígonos: áreas verdes --- */
+  if (L.parques){
+    out += '<g>';
+    for (const p of PARQUES) out += `<path class="park" d="${ptsPath(p.ring)}Z"/>`;
+    out += '</g>';
+  }
+
+  /* --- linhas: malha viária secundária --- */
+  if (L.quadras){
+    const w = clamp(metersPerPixel() < 3 ? 7 : 4.5, 3, 8);
+    let casing = '', fill = '';
+    for (const q of QUADRAS){
+      const s = seg(q.ll0, q.ll1); if (s.off) continue;
+      const d = `M${f1(s.x0)} ${f1(s.y0)}L${f1(s.x1)} ${f1(s.y1)}`;
+      casing += `<path d="${d}"/>`; fill += `<path d="${d}"/>`;
+    }
+    out += `<g class="mn-c" stroke-width="${w + 1.4}" fill="none" stroke-linecap="round">${casing}</g>`;
+    out += `<g class="mn" stroke-width="${w}" fill="none" stroke-linecap="round">${fill}</g>`;
+  }
+
+  /* --- linhas: vias principais + anel do Contorno --- */
+  if (L.vias){
+    const w = clamp(metersPerPixel() < 3 ? 11 : 7, 5, 13);
+    let casing = '', fill = '', labels = '';
+    const items = VIAS.filter(v => v.ok).map(v => ({ nome:v.nome, a:v.ll0, b:v.ll1 }));
+    for (const v of items){
+      const s = seg(v.a, v.b); if (s.off) continue;
+      const d = `M${f1(s.x0)} ${f1(s.y0)}L${f1(s.x1)} ${f1(s.y1)}`;
+      casing += `<path d="${d}"/>`; fill += `<path d="${d}"/>`;
+      if (showLbl && view.zoom > 14.6){
+        const mx = (s.x0 + s.x1) / 2, my = (s.y0 + s.y1) / 2;
+        if (mx > 40 && mx < VW - 40 && my > 20 && my < VH - 20){
+          let ang = Math.atan2(s.y1 - s.y0, s.x1 - s.x0) * 180 / Math.PI;
+          if (ang > 90) ang -= 180; if (ang < -90) ang += 180;
+          labels += `<text class="street-l mk-l" x="${f1(mx)}" y="${f1(my - 4)}"
+            text-anchor="middle" transform="rotate(${f1(ang)} ${f1(mx)} ${f1(my - 4)})"
+            >${esc(v.nome)}</text>`;
+        }
+      }
+    }
+    const cd = ptsPath(CONTORNO);
+    out += `<g class="mj-c" stroke-width="${w + 2.6}" fill="none" stroke-linecap="round">`
+         + `<path d="${cd}"/>${casing}</g>`;
+    out += `<g class="mj" stroke-width="${w}" fill="none" stroke-linecap="round">`
+         + `<path d="${cd}"/>${fill}</g>`;
+    out += labels;
+  }
+
+  /* --- rótulos de bairro e de área verde --- */
+  if (showLbl){
+    if (L.bairros){
+      out += '<g>';
+      for (const b of BAIRROS){
+        const [x, y] = P(b.centro.lat, b.centro.lon);
+        if (x < 10 || x > VW - 10 || y < 14 || y > VH - 10) continue;
+        out += `<text class="bairro-l" x="${f1(x)}" y="${f1(y)}">${esc(b.nome)}</text>`;
+      }
+      out += '</g>';
+    }
+    if (L.parques && view.zoom > 14.4){
+      out += '<g>';
+      for (const p of PARQUES){
+        const [x, y] = P(p.centro.lat, p.centro.lon);
+        if (x < 10 || x > VW - 10 || y < 14 || y > VH - 10) continue;
+        out += `<text class="park-l" x="${f1(x)}" y="${f1(y)}" text-anchor="middle">${esc(p.nome)}</text>`;
+      }
+      out += '</g>';
+    }
+  }
+
+  /* --- polígono do raio de busca --- */
+  if (H){
+    const ring = bufferRing(H, state.radius);
+    out += `<path class="buffer${state.justRan ? ' buffer-run' : ''}" d="${ptsPath(ring)}Z"/>`;
+    const [hx, hy] = P(H.lat, H.lon);
+    const rpx = Math.abs(P(H.lat, H.lon + state.radius /
+      (111320 * Math.cos(H.lat * Math.PI / 180)))[0] - hx);
+    const ang = -Math.PI / 4;
+    const ex = hx + Math.cos(ang) * rpx, ey = hy + Math.sin(ang) * rpx;
+    out += `<line class="radius-tick" x1="${f1(hx)}" y1="${f1(hy)}" x2="${f1(ex)}" y2="${f1(ey)}"/>`;
+    const lbl = state.radius >= 1000
+      ? (state.radius / 1000).toFixed(state.radius % 1000 ? 1 : 0) + ' km'
+      : state.radius + ' m';
+    const mx = hx + Math.cos(ang) * rpx * 0.58, my = hy + Math.sin(ang) * rpx * 0.58;
+    out += `<text class="radius-l radius-l-bg" x="${f1(mx)}" y="${f1(my)}" text-anchor="middle"
+      stroke="var(--map-bg)" stroke-width="4" paint-order="stroke">${lbl}</text>`;
+    out += `<text class="radius-l" x="${f1(mx)}" y="${f1(my)}" text-anchor="middle">${lbl}</text>`;
+  }
+
+  /* --- linha de rota --- */
+  if (state.route){
+    const s = seg(state.route.from, state.route.to);
+    out += `<path class="route" d="M${f1(s.x0)} ${f1(s.y0)}L${f1(s.x1)} ${f1(s.y1)}"/>`;
+  }
+
+  /* --- pontos --- */
+  const rankOf = new Map(state.results.map((r, i) => [r.id, i + 1]));
+  const r0 = clamp(4.2 + (view.zoom - 14.5) * 1.7, 4, 8.4);
+  let dots = '', hot = '', pins = '', names = '';
+
+  for (const p of PONTOS){
+    if (!state.cats.has(p.cat)) continue;
+    const [x, y] = P(p.lat, p.lon);
+    if (x < -30 || x > VW + 30 || y < -30 || y > VH + 30) continue;
+    const rank = rankOf.get(p.id);
+    const c = `var(${CATS[p.cat].cor})`;
+    if (!rank){
+      dots += `<circle class="mk dim" data-id="${p.id}" style="--c:${c}" cx="${f1(x)}"
+        cy="${f1(y)}" r="${f1(r0 * 0.66)}" fill="${c}" stroke="var(--map-bg)" stroke-width="1.2"/>`;
+      continue;
+    }
+    const on = state.selected === p.id || state.hover === p.id;
+    hot += `<g class="mk${on ? ' on' : ''}" data-id="${p.id}" style="--c:${c}">
+      <circle class="mk-halo" cx="${f1(x)}" cy="${f1(y)}" r="${f1(r0 * 2.5)}"/>
+      <circle class="mk-dot" cx="${f1(x)}" cy="${f1(y)}" r="${f1(r0 + 1.6)}"/>
+      ${rank <= 99 && r0 > 5.2 ? `<text class="mk-rank" x="${f1(x)}" y="${f1(y + 3)}">${rank}</text>` : ''}
+    </g>`;
+    if (showLbl && view.zoom > 15.6 && rank <= 10){
+      names += `<text class="mk-l" x="${f1(x + r0 + 5)}" y="${f1(y + 3.5)}">${esc(p.nome)}</text>`;
+    }
+  }
+
+  /* --- hospitais (símbolo próprio) --- */
+  for (const h of HOSPITAIS){
+    if (h.id !== state.hospital.id && !state.cats.has('hospital')) continue;
+    const [x, y] = P(h.lat, h.lon);
+    if (x < -40 || x > VW + 40 || y < -40 || y > VH + 40) continue;
+    const isRef = h.id === state.hospital.id;
+    const s = isRef ? 1 : 0.74;
+    pins += `<g class="mk" data-id="${h.id}" style="--c:var(--sig-hospital)"
+      transform="translate(${f1(x)} ${f1(y)}) scale(${s})">
+      <path class="hosp-pin" d="M0 5 C0 5 -12 -6 -12 -13 a12 12 0 0 1 24 0 C12 -6 0 5 0 5Z"/>
+      <path class="hosp-cross" d="M0 -18v9M-4.5 -13.5h9"/>
+      ${isRef ? '<circle cx="0" cy="5" r="3" fill="var(--sig-hospital)"/>' : ''}
+    </g>`;
+    if (showLbl && (isRef || view.zoom > 14.9)){
+      names += `<text class="mk-l" x="${f1(x + 13 * s)}" y="${f1(y - 8 * s)}"
+        style="font-weight:700">${esc(h.curto)}</text>`;
+    }
+  }
+
+  out += dots + hot + pins + names;
+  svg.innerHTML = out;
+  state.justRan = false;
+
+  /* barra de escala */
+  const mpp = metersPerPixel();
+  const target = 96 * mpp;
+  const pow = Math.pow(10, Math.floor(Math.log10(target)));
+  const nice = [1, 2, 5, 10].map(k => k * pow).find(v => v >= target * 0.55) || pow * 10;
+  document.getElementById('scale-bar').style.width = (nice / mpp).toFixed(1) + 'px';
+  document.getElementById('scale-txt').textContent =
+    nice >= 1000 ? (nice / 1000) + ' km' : nice + ' m';
+  document.getElementById('ft-zoom').textContent = 'z ' + view.zoom.toFixed(2)
+    + ' · ' + mpp.toFixed(2) + ' m/px';
+
+  if (state.selected) placePopup();
+}
+
+/* ─────────────────────────── 6 · CONSULTA ESPACIAL ─────────────────────────── */
+
+/** Verdadeiro se o ponto satisfaz TODOS os filtros de atributo aplicáveis. */
+function matchAttrs(p){
+  const A = state.attrs;
+  if (A.has('h24')         && p.cat !== 'ubs'         && !p.h24)         return false;
+  if (A.has('entrega')     && p.cat === 'farmacia'    && !p.entrega)     return false;
+  if (A.has('manipulacao') && p.cat === 'farmacia'    && !p.manipulacao) return false;
+  if (A.has('injetavel')   && p.cat === 'farmacia'    && !p.injetavel)   return false;
+  if (A.has('radiografia') && p.cat === 'laboratorio' && !p.radiografia) return false;
+  if (A.has('tomografia')  && p.cat === 'laboratorio' && !p.tomografia)  return false;
+  if (A.has('ultrassom')   && p.cat === 'laboratorio' && !p.ultrassom)   return false;
+  if (A.has('sus')         && p.cat !== 'farmacia'    && !p.sus)         return false;
+  return true;
+}
+
+function runQuery(animate){
+  const H = state.hospital, R = state.radius;
+
+  /* ST_Within — pontos contidos no polígono de busca */
+  const within = [];
+  for (const p of PONTOS){
+    if (!state.cats.has(p.cat) || !matchAttrs(p)) continue;
+    const d = haversine(H, p);
+    if (d <= R) within.push(Object.assign({ dist: d }, p));
+  }
+  if (state.cats.has('hospital')){
+    for (const h of HOSPITAIS){
+      if (h.id === H.id) continue;
+      const d = haversine(H, h);
+      if (d <= R) within.push(Object.assign({ dist: d }, h));
+    }
+  }
+  within.sort((x, y) => x.dist - y.dist || norm(x.nome).localeCompare(norm(y.nome)));
+  state.results = within;
+
+  /* ST_Contains / ST_Intersects sobre polígonos e linhas */
+  const hAB = { a: H.a, b: H.b };
+  const bairroDo = BAIRROS.find(b => inRect(hAB, b));
+  const bairrosContem = BAIRROS.filter(b =>
+    hAB.a - R >= b.aMin && hAB.a + R <= b.aMax && hAB.b - R >= b.bMin && hAB.b + R <= b.bMax);
+  const bairrosIntersect = BAIRROS.filter(b => distPtRect(hAB, b) <= R);
+  const viasIntersect = VIAS.filter(v => v.ok && distPtSeg(hAB, v.p0, v.p1) <= R);
+  const parquesIntersect = PARQUES.filter(p => distPtRect(hAB, p) <= R);
+
+  state.spatial = {
+    bairroDo: bairroDo ? bairroDo.nome : '—',
+    bairrosContem: bairrosContem.map(b => b.nome),
+    bairrosIntersect: bairrosIntersect.map(b => b.nome),
+    vias: viasIntersect.map(v => v.nome),
+    parques: parquesIntersect.map(p => p.nome)
+  };
+
+  state.selected = null; state.route = null; hidePopup();
+  state.justRan = !!animate;
+  paintResults(); paintSpatial(); paintRef();
+  document.getElementById('ft-feat').textContent =
+    within.length + ' de ' + PONTOS.filter(p => state.cats.has(p.cat)).length + ' feições';
+  setStatus(within.length
+    ? `Consulta concluída · ${within.length} resultado${within.length > 1 ? 's' : ''} em ${fmtDist(R)}`
+    : 'Consulta concluída · nenhum resultado no raio definido');
+  if (animate) fitBuffer();
+  draw();
+}
+
+/* ─────────────────────────── 7 · APRESENTAÇÃO ─────────────────────────── */
+
+const $ = id => document.getElementById(id);
+const fmtDist = m => m >= 1000 ? (m / 1000).toFixed(m % 1000 < 50 ? 0 : 2) + ' km'
+                               : Math.round(m) + ' m';
+const walkMin = m => Math.max(1, Math.round(m / 83.3));
+
+function sortedResults(){
+  const r = state.results.slice();
+  if (state.sort === 'az') r.sort((a, b) => norm(a.nome).localeCompare(norm(b.nome)) || a.dist - b.dist);
+  if (state.sort === 'za') r.sort((a, b) => norm(b.nome).localeCompare(norm(a.nome)) || a.dist - b.dist);
+  return r;
+}
+
+function tagsOf(p){
+  const t = [];
+  if (p.h24) t.push(['24 h', 1]);
+  if (p.cat === 'farmacia'){
+    if (p.entrega) t.push(['Entrega', 0]);
+    if (p.manipulacao) t.push(['Manipulação', 0]);
+    if (p.injetavel) t.push(['Injetáveis', 0]);
+  }
+  if (p.cat === 'laboratorio'){
+    if (p.radiografia) t.push(['Radiografia', 1]);
+    if (p.tomografia) t.push(['Tomografia', 0]);
+    if (p.ultrassom) t.push(['Ultrassom', 0]);
+    if (p.sus) t.push(['SUS', 0]);
+  }
+  if (p.cat === 'ubs') t.push(['SUS', 1]);
+  return t.slice(0, 3);
+}
+
+function paintResults(){
+  const list = sortedResults();
+  const rank = new Map(state.results.map((r, i) => [r.id, i + 1]));
+  $('res-n').textContent = state.results.length;
+  $('res-label').innerHTML = state.results.length === 1
+    ? 'estabelecimento<br>encontrado' : 'estabelecimentos<br>encontrados';
+
+  const ul = $('res-list');
+  if (!list.length){
+    ul.innerHTML = `<li><div class="empty">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="11" cy="11" r="7"/><path d="M16 16l5 5" stroke-linecap="round"/>
+        <path d="M8.4 11h5.2" stroke-linecap="round"/></svg>
+      <p>Nenhum resultado em ${fmtDist(state.radius)}</p>
+      <small>Amplie o raio de busca, escolha outra categoria
+      ou remova filtros de atributo.</small></div></li>`;
+    return;
+  }
+  ul.innerHTML = list.map(p => {
+    const c = `var(${CATS[p.cat].cor})`;
+    const on = state.selected === p.id;
+    return `<li class="res-item${on ? ' on' : ''}" data-id="${p.id}" style="--c:${c}" tabindex="0">
+      <span class="res-rank">${rank.get(p.id)}</span>
+      <div class="res-main">
+        <div class="res-name" title="${esc(p.nome)}">${esc(p.nome)}</div>
+        <div class="res-addr">${esc(p.endereco)} · ${esc(p.bairro)}</div>
+        <div class="res-tags">${tagsOf(p).map(([t, hi]) =>
+          `<span class="tag${hi ? ' tag--hi' : ''}">${esc(t)}</span>`).join('')}</div>
+      </div>
+      <div class="res-dist">
+        <div class="d">${p.dist >= 1000 ? (p.dist/1000).toFixed(2) : Math.round(p.dist)}<span class="u">${p.dist >= 1000 ? 'km' : 'm'}</span></div>
+        <div class="w">${walkMin(p.dist)} min a pé</div>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+function paintRef(){
+  const H = state.hospital;
+  const b = state.spatial ? state.spatial.bairroDo
+          : (BAIRROS.find(x => inRect(H, x)) || {}).nome || '—';
+  $('ref-readout').innerHTML =
+    `<span class="fn">POINT</span>(<span class="st">${H.lon.toFixed(5)} ${H.lat.toFixed(5)}</span>)<br>`
+  + `<span class="cm">-- bairro que contém o ponto</span><br>`
+  + `<span class="kw">bairro</span> = <span class="nm2">${esc(b)}</span>`;
+}
+
+function paintSpatial(){
+  const S = state.spatial; if (!S) return;
+  const cats = [...state.cats].map(c => `'${c}'`).join(', ');
+  const R = state.radius;
+  $('sql-readout').innerHTML =
+`<span class="kw">SELECT</span> e.nome, <span class="fn">ST_Distance</span>(e.geom, h.geom) <span class="kw">AS</span> dist_m
+<span class="kw">FROM</span>   estabelecimento e, hospital h
+<span class="kw">WHERE</span>  h.id = <span class="st">'${esc(state.hospital.id)}'</span>
+  <span class="kw">AND</span>  e.categoria <span class="kw">IN</span> (<span class="st">${esc(cats) || "''"}</span>)
+  <span class="kw">AND</span>  <span class="fn">ST_Within</span>(e.geom, <span class="fn">ST_Buffer</span>(h.geom, <span class="nm2">${R}</span>))
+<span class="kw">ORDER BY</span> dist_m <span class="kw">ASC</span>;`;
+
+  const rows = [
+    ['ST_Within', `<b>${state.results.length}</b> estabelecimento(s) contido(s) no raio de ${fmtDist(R)}`,
+     state.results.length],
+    ['ST_Contains', `Bairro <b>${esc(S.bairroDo)}</b> contém o hospital de referência`, '1'],
+    ['ST_Contains', S.bairrosContem.length
+        ? `<b>${esc(S.bairrosContem.join(', '))}</b> contém integralmente a área de busca`
+        : 'Nenhum bairro contém integralmente a área de busca',
+     S.bairrosContem.length],
+    ['ST_Intersects', `Vias principais que interceptam a área: <b>${esc(S.vias.slice(0,3).join(', ')) || '—'}</b>${S.vias.length > 3 ? ' …' : ''}`,
+     S.vias.length],
+    ['ST_Intersects', `Bairros interceptados: <b>${esc(S.bairrosIntersect.join(', ')) || '—'}</b>`,
+     S.bairrosIntersect.length],
+    ['ST_Intersects', `Áreas verdes interceptadas: <b>${esc(S.parques.join(', ')) || '—'}</b>`,
+     S.parques.length]
+  ];
+  $('pred-list').innerHTML = rows.map(([op, txt, val]) =>
+    `<div class="pred-row"><span class="pred-op">${op}</span>
+     <span class="pred-txt">${txt}</span><span class="pred-val">${val}</span></div>`).join('');
+}
+
+/* ---------- cartão de detalhe ---------- */
+function findFeature(id){ return TODOS.find(f => f.id === id); }
+
+function showPopup(id){
+  const p = findFeature(id); if (!p) return;
+  state.selected = id;
+  const res = state.results.find(r => r.id === id);
+  const c = `var(${CATS[p.cat].cor})`;
+  const isRef = p.id === state.hospital.id;
+  const rows = [];
+  rows.push(['Endereço', esc(p.endereco || p.end)]);
+  rows.push(['Bairro', esc(p.bairro || (BAIRROS.find(b => inRect(p, b)) || {}).nome || '—')]);
+  if (p.tel) rows.push(['Telefone', esc(p.tel)]);
+  if (p.horario) rows.push(['Horário', esc(p.horario)]);
+  if (p.porte) rows.push(['Perfil', esc(p.porte)]);
+  if (p.exames) rows.push(['Exames', esc(p.exames.join(' · '))]);
+  rows.push(['Coordenada', `<span class="num">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>`]);
+  if (res) rows.push(['Distância',
+    `<span class="num">${fmtDist(res.dist)}</span> · ${walkMin(res.dist)} min a pé`]);
+
+  const pop = $('popup');
+  pop.style.setProperty('--c', c);
+  pop.innerHTML = `
+    <button class="popup-close" aria-label="Fechar">×</button>
+    <div class="popup-hd">
+      <h4>${esc(p.nome)}</h4>
+      <div class="sub">${CATS[p.cat].nome}${isRef ? ' · referência da consulta' : ''}</div>
+    </div>
+    <div class="popup-bd">
+      ${rows.map(([k, v]) => `<div class="popup-row"><b>${k}</b><span>${v}</span></div>`).join('')}
+    </div>
+    <div class="popup-ft">
+      ${res ? `<button class="btn btn--sm" data-act="rota">Traçar rota</button>` : ''}
+      ${p.cat === 'hospital' && !isRef
+        ? `<button class="btn btn--sm" data-act="ref">Usar como referência</button>` : ''}
+      ${state.route ? `<button class="btn btn--sm" data-act="limpar">Limpar rota</button>` : ''}
+    </div>`;
+  pop.hidden = false;
+  placePopup();
+  paintResults();
+  draw();
+}
+function placePopup(){
+  const p = findFeature(state.selected); if (!p) return;
+  const pop = $('popup');
+  const [x, y] = P(p.lat, p.lon);
+  const w = pop.offsetWidth || 262, h = pop.offsetHeight || 200;
+  pop.style.left = clamp(x - w / 2, 8, Math.max(8, VW - w - 8)) + 'px';
+  pop.style.top  = (y - h - 20 < 8 ? clamp(y + 22, 8, VH - h - 8)
+                                   : y - h - 20) + 'px';
+}
+function hidePopup(){ $('popup').hidden = true; state.selected = null; }
+
+/* ---------- barra de estado ---------- */
+let statusTimer = 0;
+function setStatus(msg){ $('ft-status').textContent = msg; }
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => t.classList.remove('on'), 2600);
+}
+
+/* ─────────────────────────── 8 · CONTROLES ─────────────────────────── */
+
+/* --- hospitais --- */
+$('sel-hospital').innerHTML = HOSPITAIS.map(h =>
+  `<option value="${h.id}">${esc(h.nome)}</option>`).join('');
+$('sel-hospital').addEventListener('change', e => {
+  state.hospital = HOSPITAIS.find(h => h.id === e.target.value);
+  view.lat = state.hospital.lat; view.lon = state.hospital.lon;
+  runQuery(true);
+});
+
+/* --- raio --- */
+function setRadius(v, fromChip){
+  state.radius = clamp(Math.round(v), 100, 3000);
+  $('radius-range').value = state.radius;
+  $('radius-out').textContent = fmtDist(state.radius);
+  document.querySelectorAll('#radius-chips .chip').forEach(c =>
+    c.setAttribute('aria-pressed', String(+c.dataset.r === state.radius)));
+  if (!fromChip) runQuery(false); else runQuery(true);
+}
+$('radius-range').addEventListener('input', e => setRadius(+e.target.value, false));
+document.querySelectorAll('#radius-chips .chip').forEach(c =>
+  c.addEventListener('click', () => setRadius(+c.dataset.r, true)));
+
+/* --- categorias --- */
+function paintCats(){
+  const counts = {};
+  for (const p of PONTOS) counts[p.cat] = (counts[p.cat] || 0) + 1;
+  counts.hospital = HOSPITAIS.length;
+  $('cat-list').innerHTML = Object.entries(CATS).map(([k, v]) => `
+    <label class="cat" style="--c:var(${v.cor})">
+      <input type="checkbox" data-cat="${k}" ${state.cats.has(k) ? 'checked' : ''}>
+      <span class="sw"></span>
+      <span class="nm">${v.nome}</span>
+      <span class="ct">${counts[k] || 0}</span>
+    </label>`).join('');
+  $('cat-list').querySelectorAll('input').forEach(i =>
+    i.addEventListener('change', () => {
+      i.checked ? state.cats.add(i.dataset.cat) : state.cats.delete(i.dataset.cat);
+      if (!state.cats.size) toast('Selecione ao menos uma categoria.');
+      paintSubFilters(); runQuery(false);
+    }));
+  $('legend-list').innerHTML = Object.entries(CATS).map(([k, v]) =>
+    `<li><span class="k">${k === 'hospital'
+      ? `<svg width="11" height="13" viewBox="-13 -20 26 27"><path d="M0 5 C0 5 -12 -6 -12 -13 a12 12 0 0 1 24 0 C12 -6 0 5 0 5Z" fill="var(${v.cor})"/></svg>`
+      : `<span style="width:10px;height:10px;border-radius:50%;background:var(${v.cor});display:block"></span>`
+    }</span>${v.nome}</li>`).join('')
+    + `<li><span class="k"><span style="width:13px;height:0;border-top:2px dashed var(--accent);display:block"></span></span>Raio de busca</li>`
+    + `<li><span class="k"><span style="width:12px;height:8px;border:1px dashed var(--map-bairro);opacity:.6;display:block"></span></span>Limite de bairro</li>`;
+}
+
+/* --- filtros de atributo --- */
+const ATTRS = {
+  h24:         { rot:'24 horas',        cats:['farmacia','laboratorio'] },
+  entrega:     { rot:'Entrega',         cats:['farmacia'] },
+  manipulacao: { rot:'Manipulação',     cats:['farmacia'] },
+  injetavel:   { rot:'Injetáveis',      cats:['farmacia'] },
+  radiografia: { rot:'Radiografia',     cats:['laboratorio'] },
+  tomografia:  { rot:'Tomografia',      cats:['laboratorio'] },
+  ultrassom:   { rot:'Ultrassonografia',cats:['laboratorio'] },
+  sus:         { rot:'Atende SUS',      cats:['laboratorio','ubs','hospital'] }
+};
+function paintSubFilters(){
+  const avail = Object.entries(ATTRS)
+    .filter(([, v]) => v.cats.some(c => state.cats.has(c)));
+  const box = $('sub-filters');
+  if (!avail.length){
+    box.innerHTML = `<span style="font-size:12px;color:var(--ink-3)">
+      Selecione uma categoria para ver os filtros disponíveis.</span>`;
+    return;
+  }
+  box.innerHTML = avail.map(([k, v]) =>
+    `<button class="chip" data-attr="${k}" aria-pressed="${state.attrs.has(k)}">${v.rot}</button>`).join('');
+  box.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+    const k = c.dataset.attr;
+    state.attrs.has(k) ? state.attrs.delete(k) : state.attrs.add(k);
+    c.setAttribute('aria-pressed', String(state.attrs.has(k)));
+    const before = state.results.length;
+    runQuery(false);
+    if (state.attrs.has(k) && !state.results.length && before)
+      toast(`O filtro "${v_rot(k)}" eliminou todos os ${before} resultados.`);
+  }));
+}
+const v_rot = k => ATTRS[k].rot;
+
+/* --- camadas --- */
+document.querySelectorAll('#layer-chips .chip').forEach(c =>
+  c.addEventListener('click', () => {
+    const k = c.dataset.layer;
+    state.layers[k] = !state.layers[k];
+    c.setAttribute('aria-pressed', String(state.layers[k]));
+    draw();
+  }));
+
+/* --- ordenação --- */
+document.querySelectorAll('.sorters button').forEach(b =>
+  b.addEventListener('click', () => {
+    state.sort = b.dataset.sort;
+    document.querySelectorAll('.sorters button').forEach(x =>
+      x.setAttribute('aria-pressed', String(x === b)));
+    paintResults();
+    setStatus(state.sort === 'dist' ? 'Lista ordenada por proximidade'
+                                    : 'Lista ordenada alfabeticamente');
+  }));
+
+/* --- busca --- */
+$('btn-search').addEventListener('click', () => runQuery(true));
+
+/* --- lista ↔ mapa --- */
+$('res-list').addEventListener('click', e => {
+  const li = e.target.closest('[data-id]'); if (!li) return;
+  const p = findFeature(li.dataset.id);
+  if (p){ view.lat = p.lat; view.lon = p.lon; showPopup(p.id); }
+});
+$('res-list').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const li = e.target.closest('[data-id]'); if (!li) return;
+  e.preventDefault(); li.click();
+});
+$('res-list').addEventListener('mouseover', e => {
+  const li = e.target.closest('[data-id]'); if (!li) return;
+  if (state.hover !== li.dataset.id){ state.hover = li.dataset.id; draw(); }
+});
+$('res-list').addEventListener('mouseleave', () => {
+  if (state.hover){ state.hover = null; draw(); }
+});
+
+/* --- cartão de detalhe --- */
+$('popup').addEventListener('click', e => {
+  if (e.target.closest('.popup-close')) return hidePopup(), paintResults(), draw();
+  const act = e.target.closest('[data-act]'); if (!act) return;
+  const p = findFeature(state.selected);
+  if (act.dataset.act === 'rota'){
+    state.route = { from: state.hospital, to: p };
+    fitPair(state.hospital, p);
+    const d = haversine(state.hospital, p);
+    toast(`Rota traçada · ${fmtDist(d)} em linha reta · ~${walkMin(d)} min a pé`);
+    setStatus(`Rota: ${state.hospital.nome} → ${p.nome} · ${fmtDist(d)}`);
+    showPopup(p.id);
+  } else if (act.dataset.act === 'ref'){
+    state.hospital = p; $('sel-hospital').value = p.id;
+    view.lat = p.lat; view.lon = p.lon;
+    runQuery(true);
+  } else if (act.dataset.act === 'limpar'){
+    state.route = null; showPopup(state.selected);
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape'){ hidePopup(); paintResults(); draw(); } });
+
+/* --- exportação --- */
+function exportRows(){
+  return sortedResults().map((p, i) => ({
+    posicao: state.results.findIndex(r => r.id === p.id) + 1,
+    nome: p.nome, categoria: CATS[p.cat].nome, endereco: p.endereco,
+    bairro: p.bairro, distancia_m: Math.round(p.dist),
+    caminhada_min: walkMin(p.dist), lat: p.lat.toFixed(6), lon: p.lon.toFixed(6)
+  }));
+}
+$('exp-csv').addEventListener('click', async () => {
+  const rows = exportRows();
+  if (!rows.length) return toast('Não há resultados para exportar.');
+  const head = Object.keys(rows[0]).join(';');
+  const body = rows.map(r => Object.values(r).map(v => `"${v}"`).join(';')).join('\n');
+  const csv  = '\uFEFF' + head + '\n' + body;
+  const base = `geosaude-${state.hospital.id}-${state.radius}m`;
+
+  /* Página publicada: o próprio visualizador medeia o salvamento. */
+  const dl = (typeof claude !== 'undefined' && claude.use)
+    ? await claude.use('downloads') : null;
+  if (dl){
+    for (const ext of ['csv', 'txt']){
+      try {
+        await dl.save({ filename: `${base}.${ext}`, data: csv });
+        return toast(`Arquivo ${base}.${ext} salvo com ${rows.length} registro(s).`);
+      } catch (err){
+        const code = err && err.code;
+        if (code === 'extension_not_enabled') continue;
+        if (code === 'declined') return toast('Download cancelado.');
+        if (code === 'rate_limited') return toast('Aguarde um instante e tente de novo.');
+        break;
+      }
+    }
+    return toast('Não foi possível salvar aqui. Use "Copiar lista".');
+  }
+
+  /* Arquivo local: download direto do navegador. */
+  try {
+    const url = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `${base}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    toast(`CSV gerado com ${rows.length} registro(s).`);
+  } catch (err){ toast('O navegador bloqueou o download. Use "Copiar lista".'); }
+});
+$('exp-clip').addEventListener('click', async () => {
+  const rows = exportRows();
+  if (!rows.length) return toast('Não há resultados para copiar.');
+  const txt = `${state.hospital.nome} · raio de ${fmtDist(state.radius)}\n`
+    + rows.map(r => `${r.posicao}. ${r.nome} — ${r.endereco} (${r.distancia_m} m)`).join('\n');
+  try{ await navigator.clipboard.writeText(txt); toast('Lista copiada para a área de transferência.'); }
+  catch(err){ toast('Não foi possível copiar. Verifique as permissões do navegador.'); }
+});
+$('exp-print').addEventListener('click', () => window.print());
+
+/* --- tema --- */
+$('btn-theme').addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const next = cur ? (cur === 'dark' ? 'light' : 'dark') : (sysDark ? 'light' : 'dark');
+  document.documentElement.setAttribute('data-theme', next);
+  draw();
+});
+
+/* --- abas --- */
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => {
+    const on = x === t;
+    x.setAttribute('aria-selected', String(on));
+    $(x.getAttribute('aria-controls')).hidden = !on;
+  });
+  if (t.id === 'tab-map'){ measure(); draw(); }
+}));
+
+/* ─────────────────────────── 9 · NAVEGAÇÃO NO MAPA ─────────────────────────── */
+
+function measure(){
+  const r = stage.getBoundingClientRect();
+  VW = Math.max(200, r.width); VH = Math.max(200, r.height);
+  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+}
+function zoomBy(dz, cx, cy){
+  state.userMoved = true;
+  const before = unproject(cx ?? VW / 2, cy ?? VH / 2);
+  view.zoom = clamp(view.zoom + dz, 12.5, 18.5);
+  refreshOrigin();
+  const after = unproject(cx ?? VW / 2, cy ?? VH / 2);
+  view.lat += before.lat - after.lat;
+  view.lon += before.lon - after.lon;
+  draw();
+}
+function fitBounds(minLat, maxLat, minLon, maxLon, pad){
+  pad = pad ?? 60;
+  for (let z = 18.5; z >= 12.5; z -= 0.05){
+    const s = 256 * Math.pow(2, z);
+    const a = worldPx(maxLat, minLon, z), b = worldPx(minLat, maxLon, z);
+    if (b.x - a.x <= VW - pad * 2 && b.y - a.y <= VH - pad * 2){ view.zoom = z; break; }
+  }
+  view.lat = (minLat + maxLat) / 2; view.lon = (minLon + maxLon) / 2;
+}
+function fitBuffer(){
+  state.userMoved = false;
+  const H = state.hospital, R = state.radius * 1.12;
+  const dLat = R / MPD_LAT, dLon = R / (111320 * Math.cos(H.lat * Math.PI / 180));
+  fitBounds(H.lat - dLat, H.lat + dLat, H.lon - dLon, H.lon + dLon, 54);
+}
+function fitPair(p, q){
+  const m = 0.0016;
+  fitBounds(Math.min(p.lat, q.lat) - m, Math.max(p.lat, q.lat) + m,
+            Math.min(p.lon, q.lon) - m, Math.max(p.lon, q.lon) + m, 90);
+  draw();
+}
+$('zin').addEventListener('click', () => zoomBy(0.7));
+$('zout').addEventListener('click', () => zoomBy(-0.7));
+$('zfit').addEventListener('click', () => { fitBuffer(); draw(); });
+
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = svg.getBoundingClientRect();
+  zoomBy(clamp(-e.deltaY * 0.0022, -0.5, 0.5), e.clientX - r.left, e.clientY - r.top);
+}, { passive:false });
+
+let drag = null;
+svg.addEventListener('pointerdown', e => {
+  drag = { x:e.clientX, y:e.clientY, lat:view.lat, lon:view.lon, moved:0 };
+  state.userMoved = true;
+  svg.setPointerCapture(e.pointerId); svg.classList.add('dragging');
+});
+svg.addEventListener('pointermove', e => {
+  const r = svg.getBoundingClientRect();
+  const g = unproject(e.clientX - r.left, e.clientY - r.top);
+  $('ft-coord').textContent = `${g.lat.toFixed(5)}, ${g.lon.toFixed(5)}`;
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
+  const s = 256 * Math.pow(2, view.zoom);
+  const c = worldPx(drag.lat, drag.lon, view.zoom);
+  const n = Math.PI - 2 * Math.PI * (c.y - dy) / s;
+  view.lon = (c.x - dx) / s * 360 - 180;
+  view.lat = 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  draw();
+});
+const endDrag = e => {
+  if (!drag) return;
+  const wasClick = drag.moved < 5;
+  drag = null; svg.classList.remove('dragging');
+  if (!wasClick) return;
+  const hit = e.target.closest ? e.target.closest('[data-id]') : null;
+  if (hit) showPopup(hit.dataset.id);
+  else if (state.selected){ hidePopup(); paintResults(); draw(); }
+};
+svg.addEventListener('pointerup', endDrag);
+svg.addEventListener('pointercancel', () => { drag = null; svg.classList.remove('dragging'); });
+svg.addEventListener('mouseover', e => {
+  const hit = e.target.closest ? e.target.closest('[data-id]') : null;
+  const id = hit ? hit.dataset.id : null;
+  if (id !== state.hover){ state.hover = id; draw(); }
+});
+
+/* ─────────────────────────── 10 · INICIALIZAÇÃO ─────────────────────────── */
+
+new ResizeObserver(() => {
+  measure();
+  if (!state.userMoved && state.hospital) fitBuffer();
+  draw();
+}).observe(stage);
+
+measure();
+paintCats();
+paintSubFilters();
+setRadius(500, true);
+setStatus(`Base carregada · ${TODOS.length} feições · ${BAIRROS.length} bairros · `
+        + `${VIAS.length} vias principais · ${QUADRAS.length} segmentos de malha`);
+requestAnimationFrame(() => { measure(); fitBuffer(); draw(); });
+addEventListener('resize', () => { measure(); if (!state.userMoved) fitBuffer(); draw(); });
+</script>
+</body>
+</html>
