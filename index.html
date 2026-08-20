@@ -235,18 +235,7 @@ input[type="range"]{ width:100%; accent-color:var(--accent); margin:6px 0 0; }
 .cat .ct{ font-family:var(--font-mono); font-size:11px; color:var(--ink-3); }
 
 /* ---------- console de consulta espacial (ELEMENTO-ASSINATURA) ---------- */
-.console{
-  background:var(--chrome-3); border:1px solid var(--rule); border-radius:var(--r-md);
-  padding:10px 11px; font-family:var(--font-mono); font-size:11px; line-height:1.75;
-  color:var(--ink-2); overflow-x:auto; position:relative;
-}
-.console .kw{ color:var(--accent); font-weight:600; }
-.console .fn{ color:var(--sig-lab); font-weight:600; }
-.console .st{ color:var(--sig-farmacia); }
-.console .nm2{ color:var(--ink); font-weight:600; }
-.console .cm{ color:var(--ink-3); font-style:italic; }
-
-.pred{ display:flex; flex-direction:column; gap:1px; margin-top:10px; }
+.pred{ display:flex; flex-direction:column; gap:1px; }
 .pred-row{
   display:grid; grid-template-columns:auto 1fr auto; gap:9px; align-items:center;
   padding:7px 2px; border-top:1px solid var(--rule-soft); font-size:12px;
@@ -506,7 +495,6 @@ input[type="range"]{ width:100%; accent-color:var(--accent); margin:6px 0 0; }
           <span>Hospital</span>
           <select id="sel-hospital"></select>
         </label>
-        <div class="console" id="ref-readout" aria-live="polite"></div>
       </section>
 
       <section class="block">
@@ -622,7 +610,6 @@ input[type="range"]{ width:100%; accent-color:var(--accent); margin:6px 0 0; }
           <h2>Consulta espacial</h2>
           <span class="geom"><i>◇</i>topologia</span>
         </div>
-        <div class="console" id="sql-readout" aria-live="polite"></div>
         <div class="pred" id="pred-list"></div>
       </section>
 
@@ -1268,7 +1255,7 @@ function runQuery(animate){
 
   state.selected = null; state.route = null; hidePopup();
   state.justRan = !!animate;
-  paintResults(); paintSpatial(); paintRef();
+  paintResults(); paintSpatial();
   document.getElementById('ft-feat').textContent =
     within.length + ' de ' + PONTOS.filter(p => state.cats.has(p.cat)).length + ' feições';
   setStatus(within.length
@@ -1347,27 +1334,9 @@ function paintResults(){
   }).join('');
 }
 
-function paintRef(){
-  const H = state.hospital;
-  const b = state.spatial ? state.spatial.bairroDo
-          : (BAIRROS.find(x => inRect(H, x)) || {}).nome || '—';
-  $('ref-readout').innerHTML =
-    `<span class="fn">POINT</span>(<span class="st">${H.lon.toFixed(5)} ${H.lat.toFixed(5)}</span>)<br>`
-  + `<span class="cm">-- bairro que contém o ponto</span><br>`
-  + `<span class="kw">bairro</span> = <span class="nm2">${esc(b)}</span>`;
-}
-
 function paintSpatial(){
   const S = state.spatial; if (!S) return;
-  const cats = [...state.cats].map(c => `'${c}'`).join(', ');
   const R = state.radius;
-  $('sql-readout').innerHTML =
-`<span class="kw">SELECT</span> e.nome, <span class="fn">ST_Distance</span>(e.geom, h.geom) <span class="kw">AS</span> dist_m
-<span class="kw">FROM</span>   estabelecimento e, hospital h
-<span class="kw">WHERE</span>  h.id = <span class="st">'${esc(state.hospital.id)}'</span>
-  <span class="kw">AND</span>  e.categoria <span class="kw">IN</span> (<span class="st">${esc(cats) || "''"}</span>)
-  <span class="kw">AND</span>  <span class="fn">ST_Within</span>(e.geom, <span class="fn">ST_Buffer</span>(h.geom, <span class="nm2">${R}</span>))
-<span class="kw">ORDER BY</span> dist_m <span class="kw">ASC</span>;`;
 
   const rows = [
     ['ST_Within', `<b>${state.results.length}</b> estabelecimento(s) contido(s) no raio de ${fmtDist(R)}`,
