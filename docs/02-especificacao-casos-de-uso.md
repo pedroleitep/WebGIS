@@ -2,6 +2,7 @@
 
 **Grupo:** Pedro Leite Pereira, Bruno Máximo Machado
 **Sistema:** GeoSaúde BH — WebGIS para localização de serviços de saúde próximos a hospitais de Belo Horizonte
+**Site hospedado:** https://web-gis-two-eta.vercel.app/
 
 Uma tabela por caso de uso do [diagrama](01-diagrama-casos-de-uso.md), no formato exigido pelo
 enunciado: **Nome · Descrição · Fluxo principal · Fluxos alternativos · Pré-condições · Pós-condições**.

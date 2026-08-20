@@ -8,6 +8,8 @@ Trabalho de Engenharia de Software II — especificação e prototipação de um
 Abra **`index.html`** em qualquer navegador. Não há build, servidor ou dependência
 externa: um arquivo, funciona offline, inclusive com duplo clique.
 
+**Site hospedado:** https://web-gis-two-eta.vercel.app/
+
 ---
 
 ## Os três entregáveis
