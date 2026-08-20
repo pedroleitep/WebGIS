@@ -1,5 +1,6 @@
 # Entregável 2 — Especificação textual dos casos de uso
 
+**Grupo:** Pedro Leite Pereira, Bruno Máximo Machado
 **Sistema:** GeoSaúde BH — WebGIS para localização de serviços de saúde próximos a hospitais de Belo Horizonte
 
 Uma tabela por caso de uso do [diagrama](01-diagrama-casos-de-uso.md), no formato exigido pelo

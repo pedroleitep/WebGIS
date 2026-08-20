@@ -1,5 +1,6 @@
 # Entregável 1 — Diagrama de Casos de Uso
 
+**Grupo:** Pedro Leite Pereira, Bruno Máximo Machado
 **Sistema:** GeoSaúde BH — WebGIS para localização de serviços de saúde próximos a hospitais de Belo Horizonte
 **Notação:** UML 2.5
 

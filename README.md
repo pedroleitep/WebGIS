@@ -1,5 +1,7 @@
 # GeoSaúde BH — protótipo WebGIS
 
+**Grupo:** Pedro Leite Pereira, Bruno Máximo Machado
+
 Sistema para localizar serviços de saúde próximos a um hospital de Belo Horizonte.
 Trabalho de Engenharia de Software II — especificação e prototipação de um WebGIS.
 
